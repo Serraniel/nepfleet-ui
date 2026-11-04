@@ -8,7 +8,7 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
-    commit-message: { prefix: deps, prefix-development: "chore(deps-dev)" }
+    commit-message: { prefix: deps, prefix-development: 'chore(deps-dev)' }
     groups:
       runtime: { dependency-type: production, update-types: [minor, patch] }
       tooling: { dependency-type: development, update-types: [minor, patch] }
@@ -21,4 +21,4 @@ updates:
     schedule: { interval: weekly }
     commit-message: { prefix: ci }
     groups:
-      actions: { patterns: ["*"] }
+      actions: { patterns: ['*'] }
