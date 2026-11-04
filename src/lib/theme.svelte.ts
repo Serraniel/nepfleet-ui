@@ -23,6 +23,12 @@ class ThemeState {
 			this.#systemDark = e.matches;
 			this.#apply();
 		});
+		// Another tab changed the preference.
+		addEventListener('storage', (e) => {
+			if (e.key !== KEY && e.key !== null) return;
+			this.preference = parsePreference(stored());
+			this.#apply();
+		});
 	}
 
 	set(pref: Preference) {

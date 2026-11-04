@@ -32,7 +32,7 @@
 					<label>
 						<input
 							type="radio"
-							name="theme"
+							name="nepfleet-theme"
 							value={pref}
 							checked={theme.preference === pref}
 							onchange={() => theme.set(pref)}
@@ -136,7 +136,8 @@
 	.theme label:has(input:checked) {
 		background: var(--surface);
 		font-weight: 600;
-		box-shadow: 0 0 0 1px var(--border);
+		/* The accent ring is the 3:1 state cue; background and weight alone are not. */
+		box-shadow: 0 0 0 1px var(--accent);
 	}
 	.theme label:has(input:focus-visible) {
 		outline: 2px solid var(--accent);
