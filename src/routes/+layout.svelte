@@ -1,6 +1,9 @@
 <script lang="ts">
 	import '../app.css';
 	import { theme } from '#lib/theme.svelte.ts';
+	import { preferences, type Preference } from '#lib/theme.ts';
+
+	const labels: Record<Preference, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 
 	let { children } = $props();
 
@@ -23,12 +26,21 @@
 			{/each}
 		</nav>
 		<footer>
-			<button
-				onclick={() => theme.toggle()}
-				aria-label="Switch to {theme.current === 'dark' ? 'light' : 'dark'} mode"
-			>
-				{theme.current === 'dark' ? '☀︎ Light' : '☾ Dark'}
-			</button>
+			<fieldset class="theme">
+				<legend>Theme</legend>
+				{#each preferences as pref (pref)}
+					<label>
+						<input
+							type="radio"
+							name="theme"
+							value={pref}
+							checked={theme.preference === pref}
+							onchange={() => theme.set(pref)}
+						/>
+						{labels[pref]}
+					</label>
+				{/each}
+			</fieldset>
 			<small>v{__APP_VERSION__}</small>
 		</footer>
 	</aside>
@@ -83,9 +95,52 @@
 	footer {
 		margin-top: auto;
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		flex-direction: column;
+		gap: 0.75rem;
 		color: var(--muted);
+	}
+	.theme {
+		display: flex;
+		gap: 2px;
+		margin: 0;
+		padding: 2px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		background: var(--surface-2);
+	}
+	.theme legend {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	.theme label {
+		flex: 1;
+		position: relative;
+		padding: 0.3rem 0.4rem;
+		border-radius: calc(var(--radius) - 3px);
+		text-align: center;
+		font-size: 0.85rem;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.theme input {
+		position: absolute;
+		inset: 0;
+		margin: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+	.theme label:has(input:checked) {
+		background: var(--surface);
+		font-weight: 600;
+		box-shadow: 0 0 0 1px var(--border);
+	}
+	.theme label:has(input:focus-visible) {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
 	}
 	main {
 		padding: 2rem clamp(1rem, 4vw, 3rem);
