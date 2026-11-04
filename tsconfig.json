@@ -1,0 +1,10 @@
+{
+	"extends": "$app/tsconfig",
+	"include": ["src", "*.ts"],
+	"compilerOptions": {
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"skipLibCheck": true,
+		"types": ["$app/types", "vite/client", "node"]
+	}
+}

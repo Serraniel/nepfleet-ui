@@ -1,0 +1,24 @@
+# Commit types are set by .github/workflows/dependabot.yml (security / deps / ci).
+# Docker base images are pinned by digest, so a rebuilt base image under the
+# same tag still produces a PR, and with it a release on the newest base.
+version: 2
+updates:
+  # svelte and @sveltejs/kit are shipped in the bundle, so they are
+  # "dependencies"; everything else is build tooling (deps-dev, no release).
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    commit-message: { prefix: deps, prefix-development: "chore(deps-dev)" }
+    groups:
+      runtime: { dependency-type: production, update-types: [minor, patch] }
+      tooling: { dependency-type: development, update-types: [minor, patch] }
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: daily }
+    commit-message: { prefix: deps }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    commit-message: { prefix: ci }
+    groups:
+      actions: { patterns: ["*"] }
