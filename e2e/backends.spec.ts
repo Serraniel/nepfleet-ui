@@ -37,6 +37,7 @@ test('refuses plain http beyond loopback', async ({ page }) => {
 test('theme: system by default, override persists', async ({ page }) => {
 	await page.emulateMedia({ colorScheme: 'dark' });
 	await page.goto('/');
+	await expect(page.getByRole('radio', { name: 'System' })).toBeChecked();
 	await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 	await page.getByRole('radio', { name: 'Light' }).check();
 	await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');

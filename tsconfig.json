@@ -1,6 +1,6 @@
 {
 	"extends": "$app/tsconfig",
-	"include": ["src", "*.ts"],
+	"include": ["src", "e2e", "*.ts"],
 	"compilerOptions": {
 		"strict": true,
 		"noUncheckedIndexedAccess": true,

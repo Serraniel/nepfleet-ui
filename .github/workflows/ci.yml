@@ -48,10 +48,8 @@ jobs:
       - run: go install github.com/Serraniel/nepfleet/cmd/nepfleet@main
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-        env:
-          NEPFLEET_BIN: /home/runner/go/bin/nepfleet
-      - if: failure()
+      - run: npm run test:e2e # nepfleet is on PATH via setup-go
+      - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-traces
