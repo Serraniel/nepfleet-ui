@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import Toaster from './Toaster.svelte';
+	import { toasts } from './toasts.svelte.ts';
 
 	type Props = {
 		open: boolean;
@@ -18,12 +20,19 @@
 		if (open && !dialog.open) dialog.showModal();
 		if (!open && dialog.open) dialog.close();
 	});
+	// The page's toasts are inert behind a modal: show them in here instead.
+	$effect(() => {
+		if (!open) return;
+		toasts.modals++;
+		return () => toasts.modals--;
+	});
 </script>
 
 <dialog bind:this={dialog} aria-labelledby="dialog-{uid}" onclose={() => (open = false)}>
 	<h2 id="dialog-{uid}">{title}</h2>
 	<div class="body">{@render children()}</div>
 	{#if actions}<div class="actions">{@render actions()}</div>{/if}
+	{#if open}<Toaster inModal />{/if}
 </dialog>
 
 <style>

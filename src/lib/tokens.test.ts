@@ -39,6 +39,8 @@ const text: [string, string][] = [
 	['ok', 'surface'],
 	['warn', 'surface'],
 	['add-text', 'add-bg'],
+	['add-text', 'surface'],
+	['del-text', 'surface'],
 	['del-text', 'del-bg'],
 	['accent', 'surface'],
 	['accent', 'bg']
@@ -46,7 +48,9 @@ const text: [string, string][] = [
 const nonText: [string, string][] = [
 	['accent', 'surface-2'],
 	['ok', 'surface'],
-	['err', 'surface']
+	['err', 'surface'],
+	['input-border', 'bg'],
+	['input-border', 'surface']
 ];
 
 for (const name of ['light', 'dark']) {

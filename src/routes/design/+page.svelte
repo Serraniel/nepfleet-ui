@@ -59,6 +59,9 @@
 		version is restored.
 		{#snippet actions()}
 			<Button onclick={() => (dialogOpen = false)}>Cancel</Button>
+			<Button onclick={() => toasts.push('Apply failed: image not found', 'error')}
+				>Fail while open</Button
+			>
 			<Button variant="primary" onclick={() => (dialogOpen = false)}>Apply</Button>
 		{/snippet}
 	</Dialog>

@@ -31,7 +31,7 @@ test('refuses plain http beyond loopback', async ({ page }) => {
 	await page.goto('/');
 	await page.getByLabel('Backend URL').fill('http://192.168.1.2:7480');
 	await page.getByRole('button', { name: 'Add backend' }).click();
-	await expect(page.getByRole('alert')).toContainText('https');
+	await expect(page.getByRole('alert').filter({ hasText: 'https' })).toBeVisible();
 });
 
 test('theme: system by default, override persists', async ({ page }) => {

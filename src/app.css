@@ -15,6 +15,7 @@
 	--surface: #ffffff;
 	--surface-2: #eef0f4;
 	--border: #dde1e8;
+	--input-border: #858d9b;
 	--text: #161a21;
 	--muted: #5d6675;
 	--accent: #3b5bdb;
@@ -36,6 +37,7 @@
 	--surface: #171a21;
 	--surface-2: #1f232c;
 	--border: #2a2f3a;
+	--input-border: #6c7486;
 	--text: #e6e9ef;
 	--muted: #969fb0;
 	--accent: #748ffc;
@@ -72,7 +74,8 @@ input {
 
 input {
 	background: var(--surface-2);
-	border: 1px solid var(--border);
+	/* The only visible edge of a field: 3:1 against its surroundings. */
+	border: 1px solid var(--input-border);
 	border-radius: var(--radius);
 	padding: 0.5rem 0.75rem;
 	min-width: 0;
@@ -93,13 +96,6 @@ button {
 	cursor: pointer;
 }
 
-button.primary {
-	background: var(--accent);
-	border-color: var(--accent);
-	color: var(--accent-text);
-	font-weight: 600;
-}
-
 a {
 	color: var(--accent);
 }
@@ -107,4 +103,14 @@ a {
 code {
 	font-family: var(--mono);
 	font-size: 0.9em;
+}
+
+/* Visible to screen readers only. */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }

@@ -1,22 +1,26 @@
 <script lang="ts">
 	import { toasts } from './toasts.svelte.ts';
+
+	/** inModal: the instance inside an open dialog; the page's one steps back meanwhile. */
+	let { inModal = false }: { inModal?: boolean } = $props();
+	const active = $derived(inModal || toasts.modals === 0);
 </script>
 
 <!-- Two live regions: errors interrupt (alert), the rest wait (status). -->
-<div class="toaster">
+<div class="toaster" hidden={!active}>
 	<div role="alert">
-		{#each toasts.list.filter((t) => t.kind === 'error') as t (t.id)}
+		{#each active ? toasts.list.filter((t) => t.kind === 'error') : [] as t (t.id)}
 			<div class="toast error">
 				<span>{t.message}</span>
-				<button aria-label="Dismiss" onclick={() => toasts.dismiss(t.id)}>×</button>
+				<button aria-label="Dismiss: {t.message}" onclick={() => toasts.dismiss(t.id)}>×</button>
 			</div>
 		{/each}
 	</div>
 	<div role="status">
-		{#each toasts.list.filter((t) => t.kind !== 'error') as t (t.id)}
+		{#each active ? toasts.list.filter((t) => t.kind !== 'error') : [] as t (t.id)}
 			<div class="toast {t.kind}">
 				<span>{t.message}</span>
-				<button aria-label="Dismiss" onclick={() => toasts.dismiss(t.id)}>×</button>
+				<button aria-label="Dismiss: {t.message}" onclick={() => toasts.dismiss(t.id)}>×</button>
 			</div>
 		{/each}
 	</div>
@@ -32,8 +36,11 @@
 		gap: var(--space-2);
 		z-index: 10;
 	}
+	/* Not display: contents: some browsers drop the live region role then. */
 	.toaster > div {
-		display: contents;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
 	}
 	.toast {
 		display: flex;

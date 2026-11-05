@@ -6,10 +6,16 @@
 		variant?: 'default' | 'primary' | 'danger' | 'ghost';
 		children: Snippet;
 	};
-	let { variant = 'default', type = 'button', children, ...rest }: Props = $props();
+	let {
+		variant = 'default',
+		type = 'button',
+		class: extra = '',
+		children,
+		...rest
+	}: Props = $props();
 </script>
 
-<button {type} class="btn {variant}" {...rest}>{@render children()}</button>
+<button {type} class="btn {variant} {extra}" {...rest}>{@render children()}</button>
 
 <style>
 	.btn {

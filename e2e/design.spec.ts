@@ -48,8 +48,18 @@ test('toasts: errors are announced as alerts and stay', async ({ page }) => {
 	await page.goto('/design');
 	await page.getByRole('button', { name: 'Error toast' }).click();
 	await expect(page.getByRole('alert')).toContainText('health check timed out');
-	await page.getByRole('button', { name: 'Dismiss' }).click();
+	await page.getByRole('button', { name: /^Dismiss: Apply failed: health/ }).click();
 	await expect(page.getByText('health check timed out')).toBeHidden();
 	await page.getByRole('button', { name: 'Success toast' }).click();
 	await expect(page.getByRole('status')).toContainText('applied');
+});
+
+test('toasts raised while a dialog is open show inside it', async ({ page }) => {
+	await page.goto('/design');
+	await page.getByRole('button', { name: 'Open dialog' }).click();
+	const dialog = page.getByRole('dialog');
+	await dialog.getByRole('button', { name: 'Fail while open' }).click();
+	await expect(dialog.getByRole('alert')).toContainText('image not found');
+	await dialog.getByRole('button', { name: 'Dismiss: Apply failed: image not found' }).click();
+	await expect(page.getByText('image not found')).toBeHidden();
 });

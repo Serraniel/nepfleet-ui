@@ -11,7 +11,11 @@
 
 <figure>
 	<figcaption>
-		{label} <span class="add">+{counts.added}</span> <span class="del">−{counts.removed}</span>
+		{label}
+		<span aria-hidden="true"
+			><span class="add">+{counts.added}</span> <span class="del">−{counts.removed}</span></span
+		>
+		<span class="sr-only">{counts.added} lines added, {counts.removed} removed</span>
 	</figcaption>
 	{#if lines.length === 0}
 		<p class="none">Empty on both sides.</p>
@@ -91,13 +95,5 @@
 		padding: var(--space-3);
 		margin: 0;
 		color: var(--muted);
-	}
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
 	}
 </style>

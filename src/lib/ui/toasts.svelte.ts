@@ -3,6 +3,11 @@ export type Toast = { id: number; message: string; kind: 'info' | 'success' | 'e
 
 class Toasts {
 	list = $state<Toast[]>([]);
+	/**
+	 * Open modal dialogs. A modal makes the rest of the page inert, so while
+	 * one is open the dialog shows the toasts itself (see Dialog.svelte).
+	 */
+	modals = $state(0);
 	#next = 1;
 
 	/** Shows a message; errors stay until dismissed, others for `ms`. */
