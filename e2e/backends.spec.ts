@@ -13,7 +13,7 @@ async function axe(page: Page) {
 
 test('adds a real backend and shows it online', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('heading', { name: 'Backends' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Backends', exact: true })).toBeVisible();
 	await page.getByLabel('Backend URL').fill(BACKEND);
 	await page.getByRole('button', { name: 'Add backend' }).click();
 	const card = page.getByRole('listitem').filter({ hasText: BACKEND });
