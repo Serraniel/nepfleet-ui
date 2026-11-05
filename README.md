@@ -22,6 +22,8 @@ Or deploy it as a NepFleet stack behind Caddy.
 npm ci
 npm run dev      # http://localhost:5173
 npm run check && npm test
+npx playwright install chromium   # once
+NEPFLEET_BIN=$(go env GOPATH)/bin/nepfleet npm run test:e2e   # UI + real backend, with axe
 ```
 
 Architecture, security model and the release process are documented once, in the [backend repository](https://github.com/Serraniel/nepfleet/tree/main/docs). PR titles follow Conventional Commits.
