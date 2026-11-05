@@ -2,6 +2,8 @@
 	import '../app.css';
 	import { theme } from '#lib/theme.svelte.ts';
 	import { preferences, type Preference } from '#lib/theme.ts';
+	import { page } from '$app/state';
+	import Toaster from '#lib/ui/Toaster.svelte';
 
 	const labels: Record<Preference, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 
@@ -20,7 +22,7 @@
 			NepFleet
 		</a>
 		<nav aria-label="Main">
-			<a href="/" aria-current="page">Backends</a>
+			<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Backends</a>
 			{#each planned as item (item)}
 				<span class="planned" title="Planned">{item}</span>
 			{/each}
@@ -41,12 +43,18 @@
 					</label>
 				{/each}
 			</fieldset>
-			<small>v{__APP_VERSION__}</small>
+			<small
+				>v{__APP_VERSION__} ·
+				<a href="/design" aria-current={page.url.pathname === '/design' ? 'page' : undefined}
+					>Design system</a
+				></small
+			>
 		</footer>
 	</aside>
 	<main>
 		{@render children()}
 	</main>
+	<Toaster />
 </div>
 
 <style>
