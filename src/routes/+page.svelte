@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { backends } from '#lib/backends.svelte.ts';
+	import Button from '#lib/ui/Button.svelte';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
 
 	let url = $state('');
 	let error = $state('');
@@ -39,12 +41,12 @@
 		required
 		autocomplete="url"
 	/>
-	<button class="primary" type="submit">Add backend</button>
+	<Button variant="primary" type="submit">Add backend</Button>
 </form>
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if backends.list.length === 0}
-	<p class="empty">No backends yet. Add one above.</p>
+	<EmptyState title="No backends yet">Add one above to see its stacks and hosts.</EmptyState>
 {:else}
 	<ul class="grid">
 		{#each backends.list as backend (backend.id)}
@@ -67,8 +69,8 @@
 					{/if}
 				</p>
 				<div class="row actions">
-					<button onclick={() => backends.check(backend)}>Recheck</button>
-					<button onclick={() => backends.remove(backend.id)}>Remove</button>
+					<Button onclick={() => backends.check(backend)}>Recheck</Button>
+					<Button variant="ghost" onclick={() => backends.remove(backend.id)}>Remove</Button>
 				</div>
 			</li>
 		{/each}
@@ -77,8 +79,7 @@
 
 <style>
 	header p,
-	.muted,
-	.empty {
+	.muted {
 		color: var(--muted);
 	}
 	h1 {
@@ -134,12 +135,5 @@
 	}
 	.dot.offline {
 		background: var(--err);
-	}
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
 	}
 </style>

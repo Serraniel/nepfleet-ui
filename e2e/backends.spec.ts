@@ -13,7 +13,7 @@ async function axe(page: Page) {
 
 test('adds a real backend and shows it online', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('heading', { name: 'Backends' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Backends', exact: true })).toBeVisible();
 	await page.getByLabel('Backend URL').fill(BACKEND);
 	await page.getByRole('button', { name: 'Add backend' }).click();
 	const card = page.getByRole('listitem').filter({ hasText: BACKEND });
@@ -31,7 +31,7 @@ test('refuses plain http beyond loopback', async ({ page }) => {
 	await page.goto('/');
 	await page.getByLabel('Backend URL').fill('http://192.168.1.2:7480');
 	await page.getByRole('button', { name: 'Add backend' }).click();
-	await expect(page.getByRole('alert')).toContainText('https');
+	await expect(page.getByRole('alert').filter({ hasText: 'https' })).toBeVisible();
 });
 
 test('theme: system by default, override persists', async ({ page }) => {
