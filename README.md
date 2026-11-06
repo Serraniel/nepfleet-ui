@@ -1,5 +1,7 @@
 # NepFleet UI
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Serraniel/nepfleet-ui/badge)](https://scorecard.dev/viewer/?uri=github.com/Serraniel/nepfleet-ui)
+
 The optional web frontend for [NepFleet](https://github.com/Serraniel/nepfleet). It is a static app, and one instance can manage **several backends**, for example your home network and your cloud servers, from one place.
 
 - Light and dark mode, and works on mobile.
