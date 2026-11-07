@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AuthError, ConflictError, NotFoundError, normalizeUrl } from './backend.ts';
+import type { FleetEvent } from './notifications.ts';
 
 /** What a probe found on a machine (nepfleet remote probe). */
 export interface RemoteReport {
@@ -159,4 +160,47 @@ export function describe(r: RemoteReport): string {
 	if (r.nepfleetRunning) parts.push('NepFleet running');
 	else if (r.nepfleet) parts.push('NepFleet installed, not answering');
 	return parts.join(' · ');
+}
+
+/** The merged events of all connected fleets, with the unread count. */
+export interface EventPage {
+	events: FleetEvent[];
+	unread: number;
+	seen: number;
+}
+
+export async function fetchEvents(
+	daemon: string,
+	token: string,
+	after: number,
+	limit = 500,
+	fetcher: typeof fetch = fetch
+): Promise<EventPage> {
+	const data = await call(
+		daemon,
+		token,
+		'GET',
+		`/v1/events?after=${after}&limit=${limit}`,
+		undefined,
+		fetcher,
+		10000
+	);
+	const o = data as Partial<EventPage> | undefined;
+	if (
+		!o ||
+		!Array.isArray(o.events) ||
+		!o.events.every((e) => typeof e?.id === 'number' && typeof e?.title === 'string')
+	) {
+		throw new Error('Unexpected response');
+	}
+	return { events: o.events, unread: Number(o.unread) || 0, seen: Number(o.seen) || 0 };
+}
+
+export async function markSeen(
+	daemon: string,
+	token: string,
+	id: number,
+	fetcher: typeof fetch = fetch
+): Promise<void> {
+	await call(daemon, token, 'POST', '/v1/events/seen', { id }, fetcher, 10000);
 }

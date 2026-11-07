@@ -14,6 +14,11 @@
 
 	// The desktop app connects by itself. If it can't, the Fleets page says why.
 	onMount(() => {
+		// A token kept for this tab: follow it from any page, for the unread count.
+		if (local.connected) {
+			void local.refresh();
+			local.follow();
+		}
 		if (!isDesktop() || local.connected) return;
 		void startDaemon()
 			.then((d) => local.connect(d.url, d.token, false))
@@ -43,6 +48,14 @@
 			<a href="/templates" aria-current={page.url.pathname === '/templates' ? 'page' : undefined}
 				>Templates</a
 			>
+			<a
+				href="/notifications"
+				aria-current={page.url.pathname === '/notifications' ? 'page' : undefined}
+				aria-label={local.unread > 0 ? `Notifications, ${local.unread} unread` : 'Notifications'}
+			>
+				Notifications
+				{#if local.unread > 0}<span class="count" aria-hidden="true">{local.unread}</span>{/if}
+			</a>
 			{#each planned as item (item)}
 				<span class="planned" title="Planned">{item}</span>
 			{/each}
@@ -115,6 +128,16 @@
 	nav a[aria-current='page'] {
 		background: var(--surface-2);
 		font-weight: 600;
+	}
+	.count {
+		display: inline-block;
+		min-width: 1.4em;
+		padding: 0 0.35em;
+		border-radius: 999px;
+		font-size: 0.8em;
+		text-align: center;
+		color: var(--surface);
+		background: var(--text);
 	}
 	.planned {
 		color: var(--muted);

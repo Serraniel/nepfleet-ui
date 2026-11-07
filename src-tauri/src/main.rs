@@ -61,6 +61,7 @@ fn control_start() -> Result<Daemon, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![control_start])
         .run(tauri::generate_context!())
         .expect("the NepFleet window failed to start");

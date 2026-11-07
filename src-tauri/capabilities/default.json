@@ -1,7 +1,7 @@
 {
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
-	"description": "The app's window: only its own commands, no shell or file access",
+	"description": "The app's window: its own commands and system notifications, no shell or file access",
 	"windows": ["main"],
-	"permissions": ["core:default"]
+	"permissions": ["core:default", "notification:default"]
 }

@@ -6,9 +6,10 @@ const DAEMON = 'http://127.0.0.1:17999';
 const TOKEN = 'nfc_' + 'a'.repeat(43);
 
 /** A stand-in for the control daemon, on a port nothing listens on. */
-async function mockDaemon(page: Page) {
+async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown }[] = []) {
 	const remotes: Record<string, unknown>[] = [];
 	const seen: string[] = [];
+	let seenId = 0;
 	await page.route(DAEMON + '/**', async (route: Route) => {
 		const req = route.request();
 		const cors = {
@@ -58,6 +59,16 @@ async function mockDaemon(page: Page) {
 			return json(200, [
 				{ name: 'photos', target: 'local', mode: 'compose', apply: 'auto', updates: 'patch' }
 			]);
+		if (path === '/v1/events')
+			return json(200, {
+				events: events.filter((e) => e.id > Number(new URL(req.url()).searchParams.get('after'))),
+				unread: events.filter((e) => e.id > seenId).length,
+				seen: seenId
+			});
+		if (path === '/v1/events/seen') {
+			seenId = (req.postDataJSON() as { id: number }).id;
+			return route.fulfill({ status: 204, headers: cors });
+		}
 		return json(404, { error: 'not here' });
 	});
 	return seen;
@@ -126,4 +137,101 @@ test('the desktop app says when nepfleet is missing', async ({ page }) => {
 	await page.goto('/fleets');
 	await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
 	await expect(page.getByText('The nepfleet command was not found')).toBeVisible();
+});
+
+test('notifications: unread count, list, read, and system notifications only when asked', async ({
+	page,
+	context
+}) => {
+	await context.grantPermissions(['notifications']);
+	await page.addInitScript(() => {
+		const shown: string[] = [];
+		(window as unknown as Record<string, unknown>).shownNotifications = shown;
+		class Fake {
+			static permission = 'granted';
+			static requestPermission = async () => 'granted';
+			constructor(title: string) {
+				shown.push(title);
+			}
+		}
+		(window as unknown as Record<string, unknown>).Notification = Fake;
+	});
+	const events: { id: number; [k: string]: unknown }[] = [
+		{
+			id: 1,
+			time: '2026-11-07T10:00:00Z',
+			name: 'apply.failed',
+			severity: 'error',
+			fleet: 'nas',
+			stack: 'web',
+			title: 'applying web failed',
+			message: 'compose failed\n<img src=x onerror=alert(1)>'
+		}
+	];
+	await mockDaemon(page, events);
+	await page.goto('/fleets');
+	await page.getByLabel('Daemon address').fill(DAEMON);
+	await page.getByLabel('Token').fill(TOKEN);
+	await page.getByRole('button', { name: 'Connect' }).click();
+	const link = page.getByRole('link', { name: 'Notifications, 1 unread' });
+	await expect(link).toBeVisible();
+	await link.click();
+
+	// Text from a fleet stays text, and links go to the stack.
+	const title = page.getByRole('link', { name: 'applying web failed' });
+	await expect(title).toHaveAttribute('href', '/stacks/local%3Anas/web');
+	await page.getByText('Details').click();
+	await expect(page.getByText('<img src=x onerror=alert(1)>')).toBeVisible();
+	await expect(page.locator('main img, li img')).toHaveCount(0);
+
+	const { violations } = await new AxeBuilder({ page })
+		.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+		.analyze();
+	expect(violations.map((v) => `${v.id}: ${v.help} (${v.nodes.length})`)).toEqual([]);
+
+	await page.getByRole('button', { name: 'Mark all read' }).click();
+	await expect(page.getByRole('link', { name: 'Notifications', exact: true })).toBeVisible();
+
+	// Off by default: a new event shows up, but nothing pops up.
+	events.push({
+		id: 2,
+		time: '2026-11-07T10:01:00Z',
+		name: 'container.oom',
+		severity: 'error',
+		fleet: 'nas',
+		title: 'first'
+	});
+	await expect(page.getByText('first')).toBeVisible({ timeout: 10000 });
+	expect(
+		await page.evaluate(
+			() => (window as unknown as { shownNotifications: string[] }).shownNotifications
+		)
+	).toEqual([]);
+
+	// Asked for: errors pop up, below the chosen severity they don't.
+	await page.getByLabel('Show system notifications on this device').check();
+	events.push({
+		id: 3,
+		time: '2026-11-07T10:02:00Z',
+		name: 'x',
+		severity: 'info',
+		fleet: 'nas',
+		title: 'quiet'
+	});
+	events.push({
+		id: 4,
+		time: '2026-11-07T10:02:01Z',
+		name: 'y',
+		severity: 'error',
+		fleet: 'nas',
+		title: 'loud'
+	});
+	await expect(page.getByText('loud')).toBeVisible({ timeout: 10000 });
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() => (window as unknown as { shownNotifications: string[] }).shownNotifications
+			)
+		)
+		.toEqual(['nas: loud']);
 });
