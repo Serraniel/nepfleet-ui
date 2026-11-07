@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchInfo, normalizeUrl } from './backend.ts';
+import { AuthError, fetchInfo, fetchStacks, normalizeUrl } from './backend.ts';
 
 describe('normalizeUrl', () => {
 	it('accepts https and strips trailing slashes', () => {
@@ -27,5 +27,30 @@ describe('fetchInfo', () => {
 	it('rejects foreign responses', async () => {
 		const fake = (async () => new Response('{"hello":"world"}')) as typeof fetch;
 		await expect(fetchInfo(backend, fake)).rejects.toThrow(/NepFleet/);
+	});
+});
+
+describe('fetchStacks', () => {
+	const backend = { id: 'a', url: 'https://fleet.example.org' };
+	const stack = { name: 'web', target: 'nas', mode: 'compose', apply: 'manual', updates: 'notify' };
+	it('sends the token and returns the stacks', async () => {
+		let auth = '';
+		const fake = (async (_url: string, init?: RequestInit) => {
+			auth = new Headers(init?.headers).get('Authorization') ?? '';
+			return new Response(
+				JSON.stringify([stack, { ...stack, name: 'db', template: 'official/x@1' }])
+			);
+		}) as typeof fetch;
+		const got = await fetchStacks(backend, 'nft_abc', fake);
+		expect(auth).toBe('Bearer nft_abc');
+		expect(got.map((s) => s.name)).toEqual(['web', 'db']);
+	});
+	it('reports a refused token as an auth error', async () => {
+		const fake = (async () => new Response('no', { status: 401 })) as typeof fetch;
+		await expect(fetchStacks(backend, 'nft_x', fake)).rejects.toBeInstanceOf(AuthError);
+	});
+	it('rejects malformed lists', async () => {
+		const fake = (async () => new Response('[{"name":1}]')) as typeof fetch;
+		await expect(fetchStacks(backend, 'nft_x', fake)).rejects.toThrow(/Unexpected/);
 	});
 });

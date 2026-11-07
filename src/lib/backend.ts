@@ -62,3 +62,44 @@ export async function fetchInfo(
 	if (!isInfo(body)) throw new Error('Unexpected response: is this a NepFleet backend?');
 	return body;
 }
+
+/** A stack as GET /api/v1/stacks lists it. */
+export interface StackInfo {
+	name: string;
+	target: string;
+	mode: string;
+	apply: string;
+	template?: string;
+	updates: string;
+}
+
+function isStack(v: unknown): v is StackInfo {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return (
+		['name', 'target', 'mode', 'apply', 'updates'].every((k) => typeof o[k] === 'string') &&
+		(o.template === undefined || typeof o.template === 'string')
+	);
+}
+
+/** Thrown when the backend refuses the token (401) or locks out (429). */
+export class AuthError extends Error {}
+
+/** Lists a backend's stacks with an API token (nepfleet token create). */
+export async function fetchStacks(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 10000
+): Promise<StackInfo[]> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks`, {
+		signal: AbortSignal.timeout(timeoutMs),
+		headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	const body: unknown = await res.json();
+	if (!Array.isArray(body) || !body.every(isStack)) throw new Error('Unexpected response');
+	return body;
+}
