@@ -3,11 +3,22 @@
 	import { theme } from '#lib/theme.svelte.ts';
 	import { preferences, type Preference } from '#lib/theme.ts';
 	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import { isDesktop, startDaemon } from '#lib/desktop.ts';
+	import { local } from '#lib/local.svelte.ts';
 	import Toaster from '#lib/ui/Toaster.svelte';
 
 	const labels: Record<Preference, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 
 	let { children } = $props();
+
+	// The desktop app connects by itself. If it can't, the Fleets page says why.
+	onMount(() => {
+		if (!isDesktop() || local.connected) return;
+		void startDaemon()
+			.then((d) => local.connect(d.url, d.token, false))
+			.catch(() => {});
+	});
 
 	// Sections arrive with their milestones; listed so the shape of the app is visible.
 	const planned = ['Hosts', 'Updates', 'Tunnels'];
