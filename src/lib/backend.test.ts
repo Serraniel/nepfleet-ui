@@ -12,8 +12,37 @@ import {
 	fetchPlan,
 	fetchStacks,
 	normalizeUrl,
-	stackPlaces
+	stackPlaces,
+	stackRelations
 } from './backend.ts';
+
+describe('stackRelations', () => {
+	const base = { target: 'nas', mode: 'compose', apply: 'manual', updates: 'notify' };
+	const all = [
+		{ ...base, name: 'jellyfin' },
+		{
+			...base,
+			name: 'homepage',
+			uses: [{ key: 'JELLYFIN_KEY', from: 'jellyfin', secret: 'API_KEY' }]
+		},
+		{ ...base, name: 'seerr', uses: [{ key: 'MEDIA_URL', from: 'jellyfin', value: 'URL' }] }
+	];
+	it('shows both directions', () => {
+		const j = stackRelations(all, 'jellyfin');
+		expect(j.uses).toEqual([]);
+		expect(j.usedBy.map((r) => `${r.stack}/${r.key}`)).toEqual([
+			'homepage/JELLYFIN_KEY',
+			'seerr/MEDIA_URL'
+		]);
+		expect(stackRelations(all, 'homepage').uses[0]?.secret).toBe('API_KEY');
+		expect(stackRelations(all, 'homepage').usedBy).toEqual([]);
+	});
+	it('handles a stack it does not know, and odd entries', () => {
+		expect(stackRelations(all, 'nope')).toEqual({ uses: [], usedBy: [] });
+		const odd = [{ ...base, name: 'x', uses: [null, { key: 1 }] as never }];
+		expect(stackRelations(odd, 'x')).toEqual({ uses: [], usedBy: [] });
+	});
+});
 
 describe('stackPlaces', () => {
 	const stack = { name: 'web', target: 'nas', mode: 'compose', apply: 'manual', updates: 'notify' };

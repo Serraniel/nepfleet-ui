@@ -14,6 +14,7 @@
 		fetchPlan,
 		fetchStacks,
 		stackPlaces,
+		stackRelations,
 		startApply,
 		startRollback
 	} from '#lib/backend.ts';
@@ -68,14 +69,18 @@
 	}
 
 	let places = $state<StackLink[]>([]);
+	let relations = $state<ReturnType<typeof stackRelations>>({ uses: [], usedBy: [] });
 
 	/** A nicety: without them, the rest of the page works just the same. */
 	async function loadPlaces() {
 		places = [];
+		relations = { uses: [], usedBy: [] };
 		if (!backend || !token) return;
 		try {
-			const info = (await fetchStacks(backend, token)).find((s) => s.name === name);
+			const all = await fetchStacks(backend, token);
+			const info = all.find((s) => s.name === name);
 			places = info ? stackPlaces(info) : [];
+			relations = stackRelations(all, name);
 		} catch {
 			places = [];
 		}
@@ -218,6 +223,37 @@
 			<li><a href={place.url} target="_blank" rel="noopener noreferrer">{place.name}</a></li>
 		{/each}
 	</ul>
+{/if}
+{#snippet stackLink(other: string)}
+	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(other)}">{other}</a>
+{/snippet}
+{#if relations.uses.length}
+	<section aria-labelledby="uses-h">
+		<h2 id="uses-h">Uses</h2>
+		<ul>
+			{#each relations.uses as r (r.key)}
+				<li>
+					<code>{r.key}</code> from {@render stackLink(r.from)}:
+					{#if r.secret}secret <code>{r.secret}</code>{:else}<code>{r.value}</code>{/if}
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/if}
+{#if relations.usedBy.length}
+	<section aria-labelledby="used-by-h">
+		<h2 id="used-by-h">Used by</h2>
+		<p class="muted">Changing these values here changes those stacks too.</p>
+		<ul>
+			{#each relations.usedBy as r (r.stack + '/' + r.key)}
+				<li>
+					{@render stackLink(r.stack)} takes
+					{#if r.secret}secret <code>{r.secret}</code>{:else}<code>{r.value}</code>{/if}
+					as <code>{r.key}</code>
+				</li>
+			{/each}
+		</ul>
+	</section>
 {/if}
 
 {#if !backend}
