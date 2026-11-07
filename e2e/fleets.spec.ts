@@ -71,7 +71,7 @@ test('adds a machine, connects it, and its stacks show up', async ({ page }) => 
 	await page.getByLabel('Daemon address').fill(DAEMON);
 	await page.getByLabel('Token').fill('not-a-token');
 	await page.getByRole('button', { name: 'Connect' }).click();
-	await expect(page.getByRole('alert')).toContainText('nepfleet control token');
+	await expect(page.getByText('The token comes from: nepfleet control token')).toBeVisible();
 
 	await page.getByLabel('Token').fill(TOKEN);
 	await page.getByRole('button', { name: 'Connect' }).click();
