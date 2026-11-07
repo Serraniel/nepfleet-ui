@@ -80,11 +80,37 @@ export interface StackInfo {
 	url?: string;
 	/** Other places to look at it, such as its logs. */
 	links?: StackLink[];
+	/** Values it takes from other stacks: names only, never values. */
+	uses?: StackRef[];
 }
 
 export interface StackLink {
 	name: string;
 	url: string;
+}
+
+export interface StackRef {
+	/** The value's name in the stack that takes it. */
+	key: string;
+	from: string;
+	value?: string;
+	secret?: string;
+}
+
+/** How a stack and others depend on each other, both ways round. */
+export function stackRelations(
+	all: StackInfo[],
+	name: string
+): { uses: StackRef[]; usedBy: (StackRef & { stack: string })[] } {
+	const valid = (r: StackRef) => typeof r?.key === 'string' && typeof r?.from === 'string';
+	return {
+		uses: (all.find((s) => s.name === name)?.uses ?? []).filter(valid),
+		usedBy: all.flatMap((s) =>
+			(s.uses ?? [])
+				.filter((r) => valid(r) && r.from === name)
+				.map((r) => ({ ...r, stack: s.name }))
+		)
+	};
 }
 
 /**
