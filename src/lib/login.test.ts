@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { fetchAuthStatus, setUp, signIn, signOut } from './login.ts';
+import {
+	beginCodes,
+	fetchAuthStatus,
+	finishCodes,
+	removeCodes,
+	setUp,
+	signIn,
+	signInWithCode,
+	signOut
+} from './login.ts';
 
 const backend = { id: 'b', url: 'https://api.example.org' };
 
@@ -15,6 +24,42 @@ function fake(routes: Record<string, () => Response>) {
 
 const begun = () =>
 	new Response(JSON.stringify({ ceremony: 'c1', options: { publicKey: { challenge: 'x' } } }));
+
+describe('sign-in codes', () => {
+	it('signs in, trimmed, and says so when refused', async () => {
+		const ok = fake({ '/api/v1/auth/totp/login': () => new Response(null, { status: 204 }) });
+		await signInWithCode(backend, ' Ada ', ' 123456 ', ok.fetcher);
+		expect(JSON.parse(String(ok.calls[0]?.init.body))).toEqual({ name: 'Ada', code: '123456' });
+		expect(ok.calls[0]?.init.credentials).toBe('include');
+		const no = fake({ '/api/v1/auth/totp/login': () => new Response('', { status: 401 }) });
+		await expect(signInWithCode(backend, 'Ada', '000000', no.fetcher)).rejects.toThrow(
+			/Wrong name or code/
+		);
+	});
+	it('sets up with the ceremony it got, and turns off', async () => {
+		const f = fake({
+			'/api/v1/auth/totp/begin': () =>
+				new Response(JSON.stringify({ ceremony: 'c 1', secret: 'S', url: 'otpauth://x' })),
+			'/api/v1/auth/totp/finish': () => new Response(null, { status: 204 }),
+			'/api/v1/auth/totp/remove': () => new Response(null, { status: 204 })
+		});
+		const setup = await beginCodes(backend, f.fetcher);
+		await finishCodes(backend, setup.ceremony, '123456', f.fetcher);
+		expect(f.calls[1]?.url).toContain('totp/finish?ceremony=c%201');
+		await removeCodes(backend, f.fetcher);
+		expect(f.calls[2]?.url).toContain('totp/remove');
+	});
+	it('refuses an odd answer to begin', async () => {
+		const f = fake({ '/api/v1/auth/totp/begin': () => new Response('{}') });
+		await expect(beginCodes(backend, f.fetcher)).rejects.toThrow(/Unexpected/);
+	});
+	it('reads whether codes are on', async () => {
+		const f = fake({
+			'/api/v1/auth/status': () => new Response(JSON.stringify({ signedIn: true, totp: true }))
+		});
+		expect((await fetchAuthStatus(backend, f.fetcher))?.totp).toBe(true);
+	});
+});
 
 describe('fetchAuthStatus', () => {
 	it('reads status, and null means passkeys are off', async () => {
