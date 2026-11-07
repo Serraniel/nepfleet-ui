@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { AuthError, fetchInfo, fetchStacks, normalizeUrl } from './backend.ts';
+import {
+	AuthError,
+	NotFoundError,
+	fetchHistory,
+	fetchInfo,
+	fetchPlan,
+	fetchStacks,
+	normalizeUrl
+} from './backend.ts';
 
 describe('normalizeUrl', () => {
 	it('accepts https and strips trailing slashes', () => {
@@ -52,5 +60,55 @@ describe('fetchStacks', () => {
 	it('rejects malformed lists', async () => {
 		const fake = (async () => new Response('[{"name":1}]')) as typeof fetch;
 		await expect(fetchStacks(backend, 'nft_x', fake)).rejects.toThrow(/Unexpected/);
+	});
+});
+
+describe('fetchPlan and fetchHistory', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const respond = (status: number, body: unknown) =>
+		(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+	it('reads a plan and sends the token', async () => {
+		let auth = '';
+		let url = '';
+		const fetcher = (async (u: string, init: RequestInit) => {
+			url = u;
+			auth = new Headers(init.headers).get('Authorization') ?? '';
+			return new Response(
+				JSON.stringify({ stack: 'web', mode: 'compose', first: false, changes: null })
+			);
+		}) as unknown as typeof fetch;
+		const p = await fetchPlan(backend, 'nft_x', 'web', fetcher);
+		expect(p.stack).toBe('web');
+		expect(auth).toBe('Bearer nft_x');
+		expect(url).toBe('https://fleet.example.org/api/v1/stacks/web/plan');
+	});
+	it('tells unknown stacks and refused tokens apart', async () => {
+		await expect(fetchPlan(backend, 't', 'x', respond(404, 'no'))).rejects.toBeInstanceOf(
+			NotFoundError
+		);
+		await expect(fetchHistory(backend, 't', 'x', 5, respond(401, 'no'))).rejects.toBeInstanceOf(
+			AuthError
+		);
+		await expect(fetchHistory(backend, 't', 'x', 5, respond(200, [{ commit: 1 }]))).rejects.toThrow(
+			/Unexpected/
+		);
+	});
+	it('reads history', async () => {
+		const h = await fetchHistory(
+			backend,
+			't',
+			'web',
+			5,
+			respond(200, [
+				{
+					commit: 'abc',
+					date: '2026-11-07T08:00:00+01:00',
+					author: 'A',
+					subject: 's',
+					applied: true
+				}
+			])
+		);
+		expect(h[0]?.applied).toBe(true);
 	});
 });

@@ -57,3 +57,22 @@ export function stat(lines: DiffLine[]): { added: number; removed: number } {
 		removed: lines.filter((l) => l.kind === 'del').length
 	};
 }
+
+export type ContextLine = { kind: 'same' | 'add' | 'del' | 'gap'; text: string };
+
+/**
+ * Parses the backend's context diff ("+ added", "- removed", "  same",
+ * "  …" between hunks) into lines to show.
+ */
+export function parseContextDiff(diff: string): ContextLine[] {
+	return diff
+		.split('\n')
+		.filter((l, i, all) => l !== '' || i < all.length - 1)
+		.map((l) => {
+			const body = l.slice(2);
+			if (l.startsWith('+ ')) return { kind: 'add', text: body };
+			if (l.startsWith('- ')) return { kind: 'del', text: body };
+			if (l === '  …') return { kind: 'gap', text: '…' };
+			return { kind: 'same', text: body };
+		});
+}

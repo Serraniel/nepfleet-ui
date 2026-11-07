@@ -103,3 +103,132 @@ export async function fetchStacks(
 	if (!Array.isArray(body) || !body.every(isStack)) throw new Error('Unexpected response');
 	return body;
 }
+
+/** Thrown when the backend has no such stack, or the token does not cover it. */
+export class NotFoundError extends Error {}
+
+/** GET with an API token; validate checks the body's shape. */
+async function apiGet<T>(
+	backend: Backend,
+	token: string,
+	path: string,
+	validate: (v: unknown) => v is T,
+	fetcher: typeof fetch,
+	timeoutMs: number
+): Promise<T> {
+	const res = await fetcher(`${backend.url}${path}`, {
+		signal: AbortSignal.timeout(timeoutMs),
+		headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	const body: unknown = await res.json();
+	if (!validate(body)) throw new Error('Unexpected response');
+	return body;
+}
+
+/** One file or image a plan changes; diff is a context diff, secrets masked. */
+export interface PlanChange {
+	path: string;
+	kind: 'added' | 'changed' | 'removed';
+	diff?: string;
+}
+
+/** One thing apply will do, in order. */
+export interface PlanStep {
+	kind: string;
+	text: string;
+	service?: string;
+	destructive?: boolean;
+}
+
+/** What GET /api/v1/stacks/{name}/plan returns. */
+export interface Plan {
+	stack: string;
+	mode: string;
+	first: boolean;
+	changes: PlanChange[] | null;
+	destructive?: string[];
+	generated?: string[];
+	steps?: PlanStep[];
+	approximate?: boolean;
+	template?: string;
+	templateFrom?: string;
+}
+
+function isPlan(v: unknown): v is Plan {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	const changes = o.changes;
+	return (
+		typeof o.stack === 'string' &&
+		typeof o.first === 'boolean' &&
+		(changes === null ||
+			(Array.isArray(changes) &&
+				changes.every(
+					(c) =>
+						typeof c === 'object' &&
+						c !== null &&
+						typeof (c as Record<string, unknown>).path === 'string'
+				)))
+	);
+}
+
+/** A commit that touched a stack. */
+export interface HistoryEntry {
+	commit: string;
+	date: string;
+	author: string;
+	subject: string;
+	applied?: boolean;
+}
+
+function isHistory(v: unknown): v is HistoryEntry[] {
+	return (
+		Array.isArray(v) &&
+		v.every((e) => {
+			if (typeof e !== 'object' || e === null) return false;
+			const o = e as Record<string, unknown>;
+			return ['commit', 'date', 'author', 'subject'].every((k) => typeof o[k] === 'string');
+		})
+	);
+}
+
+/** What applying a stack would change. */
+export function fetchPlan(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<Plan> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/plan`,
+		isPlan,
+		fetcher,
+		timeoutMs
+	);
+}
+
+/** The last commits that touched a stack, newest first. */
+export function fetchHistory(
+	backend: Backend,
+	token: string,
+	stack: string,
+	n = 20,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 10000
+): Promise<HistoryEntry[]> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/history?n=${n}`,
+		isHistory,
+		fetcher,
+		timeoutMs
+	);
+}
