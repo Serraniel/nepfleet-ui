@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { page } from '$app/state';
 	import {
 		AuthError,
@@ -14,6 +14,7 @@
 		startApply
 	} from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { local } from '#lib/local.svelte.ts';
 	import { parseContextDiff } from '#lib/diff.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -61,6 +62,12 @@
 			plan = failed(e);
 		}
 	}
+
+	// Opened directly: remotes through the control daemon aren't listed yet.
+	onMount(() => {
+		void local.refresh();
+		local.follow();
+	});
 
 	$effect(() => {
 		void backendId;

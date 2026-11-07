@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { local } from '#lib/local.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -13,13 +14,18 @@
 	let tokenError = $state<Record<string, string>>({});
 
 	onMount(() => {
-		void backends.checkAll();
-		void stacks.loadAll();
+		// Remotes through the control daemon join the list when it answers.
+		void local.refresh().then(() => {
+			void backends.checkAll();
+			void stacks.loadAll();
+		});
+		local.follow();
 	});
 
 	function backendName(id: string): string {
 		const s = backends.status[id];
 		const b = backends.list.find((x) => x.id === id);
+		if (b?.label) return b.label;
 		return s?.state === 'online' ? s.info.name : b ? new URL(b.url).host : id;
 	}
 
@@ -103,7 +109,9 @@
 					<Button onclick={() => stacks.load(backend)}>Retry</Button>
 				{:else}
 					<p class="muted">{st.stacks.length} stacks</p>
-					<Button variant="ghost" onclick={() => forget(backend.id)}>Forget token</Button>
+					{#if !backend.local}
+						<Button variant="ghost" onclick={() => forget(backend.id)}>Forget token</Button>
+					{/if}
 				{/if}
 			</div>
 		{/each}

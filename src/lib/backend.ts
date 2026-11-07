@@ -4,6 +4,9 @@
 export interface Backend {
 	id: string;
 	url: string;
+	/** A remote reached through the local control daemon; never saved. */
+	local?: boolean;
+	label?: string;
 }
 
 /** What GET /api/v1/info returns. */
@@ -50,12 +53,14 @@ function isInfo(v: unknown): v is BackendInfo {
 export async function fetchInfo(
 	backend: Backend,
 	fetcher: typeof fetch = fetch,
-	timeoutMs = 5000
+	timeoutMs = 5000,
+	token?: string
 ): Promise<BackendInfo> {
 	const res = await fetcher(`${backend.url}/api/v1/info`, {
 		signal: AbortSignal.timeout(timeoutMs),
-		credentials: 'include',
-		headers: { Accept: 'application/json' }
+		// A token replaces cookies; the control daemon doesn't accept credentials.
+		credentials: token ? 'omit' : 'include',
+		headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
 	});
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
 	const body: unknown = await res.json();

@@ -23,6 +23,9 @@
 		</a>
 		<nav aria-label="Main">
 			<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Backends</a>
+			<a href="/fleets" aria-current={page.url.pathname === '/fleets' ? 'page' : undefined}
+				>Fleets</a
+			>
 			<a href="/stacks" aria-current={page.url.pathname === '/stacks' ? 'page' : undefined}
 				>Stacks</a
 			>

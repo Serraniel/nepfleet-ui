@@ -118,7 +118,8 @@
 	<div class="filters">
 		<label for="backend" class="sr-only">Backend</label>
 		<select id="backend" bind:value={backendId}>
-			{#each withToken as b (b.id)}<option value={b.id}>{new URL(b.url).host}</option>{/each}
+			{#each withToken as b (b.id)}<option value={b.id}>{b.label ?? new URL(b.url).host}</option
+				>{/each}
 		</select>
 		<label for="q" class="sr-only">Search</label>
 		<input id="q" type="search" placeholder="Search templates" bind:value={query} />
