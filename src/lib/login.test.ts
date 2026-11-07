@@ -3,6 +3,7 @@ import {
 	beginCodes,
 	fetchAuthStatus,
 	finishCodes,
+	providerLoginUrl,
 	removeCodes,
 	setUp,
 	signIn,
@@ -24,6 +25,25 @@ function fake(routes: Record<string, () => Response>) {
 
 const begun = () =>
 	new Response(JSON.stringify({ ceremony: 'c1', options: { publicKey: { challenge: 'x' } } }));
+
+describe('identity provider', () => {
+	it('builds the sign-in address, with where to come back to', () => {
+		expect(providerLoginUrl(backend, 'https://ui.example.org/stacks?a=1')).toBe(
+			'https://api.example.org/api/v1/auth/oidc/login?return=https%3A%2F%2Fui.example.org%2Fstacks%3Fa%3D1'
+		);
+	});
+	it('reads which ways in there are', async () => {
+		const status = (o: object) =>
+			fetchAuthStatus(
+				backend,
+				fake({ '/api/v1/auth/status': () => new Response(JSON.stringify(o)) }).fetcher
+			);
+		const provider = await status({ oidc: true, passkeys: false, external: true });
+		expect(provider).toMatchObject({ oidc: true, passkeys: false, external: true });
+		// A backend from before these fields has passkeys only.
+		expect(await status({})).toMatchObject({ oidc: false, passkeys: true, external: false });
+	});
+});
 
 describe('sign-in codes', () => {
 	it('signs in, trimmed, and says so when refused', async () => {
