@@ -232,3 +232,57 @@ export function fetchHistory(
 		timeoutMs
 	);
 }
+
+/** One template in a source's catalogue (index.json format). */
+export interface TemplateEntry {
+	name: string;
+	title?: string;
+	description?: string;
+	tier: string;
+	category?: string;
+	homepage?: string;
+	version: string;
+	supports: Record<string, boolean>;
+	inputs: import('./inputs.ts').TemplateInput[] | null;
+	generate: { name: string }[] | null;
+}
+
+/** What GET /api/v1/templates returns per template source. */
+export interface SourceCatalogue {
+	source: string;
+	commit?: string;
+	templates: TemplateEntry[] | null;
+	invalid?: string[];
+}
+
+function isCatalogues(v: unknown): v is SourceCatalogue[] {
+	return (
+		Array.isArray(v) &&
+		v.every((s) => {
+			if (typeof s !== 'object' || s === null) return false;
+			const o = s as Record<string, unknown>;
+			return (
+				typeof o.source === 'string' &&
+				(o.templates === null ||
+					(Array.isArray(o.templates) &&
+						o.templates.every(
+							(t) =>
+								typeof t === 'object' &&
+								t !== null &&
+								typeof (t as Record<string, unknown>).name === 'string' &&
+								typeof (t as Record<string, unknown>).version === 'string'
+						)))
+			);
+		})
+	);
+}
+
+/** The template catalogues of a backend's fleet. */
+export function fetchTemplates(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<SourceCatalogue[]> {
+	return apiGet(backend, token, '/api/v1/templates', isCatalogues, fetcher, timeoutMs);
+}

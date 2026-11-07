@@ -10,7 +10,7 @@
 	let { children } = $props();
 
 	// Sections arrive with their milestones; listed so the shape of the app is visible.
-	const planned = ['Hosts', 'Templates', 'Updates', 'Tunnels'];
+	const planned = ['Hosts', 'Updates', 'Tunnels'];
 </script>
 
 <div class="shell">
@@ -25,6 +25,9 @@
 			<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Backends</a>
 			<a href="/stacks" aria-current={page.url.pathname === '/stacks' ? 'page' : undefined}
 				>Stacks</a
+			>
+			<a href="/templates" aria-current={page.url.pathname === '/templates' ? 'page' : undefined}
+				>Templates</a
 			>
 			{#each planned as item (item)}
 				<span class="planned" title="Planned">{item}</span>
