@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
 	AuthError,
+	ConflictError,
+	ScopeError,
+	startApply,
+	fetchJob,
 	NotFoundError,
 	fetchHistory,
 	fetchInfo,
@@ -110,5 +114,40 @@ describe('fetchPlan and fetchHistory', () => {
 			])
 		);
 		expect(h[0]?.applied).toBe(true);
+	});
+});
+
+describe('startApply', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const job = { id: 'j1', stack: 'web', kind: 'apply', state: 'running', log: '', by: 'ui' };
+	it('sends the reviewed plan and returns the job', async () => {
+		let body = '';
+		let method = '';
+		const fetcher = (async (_: string, init: RequestInit) => {
+			body = String(init.body);
+			method = String(init.method);
+			return new Response(JSON.stringify(job), { status: 202 });
+		}) as unknown as typeof fetch;
+		const j = await startApply(backend, 't', 'web', 'abc', true, fetcher);
+		expect(j.id).toBe('j1');
+		expect(method).toBe('POST');
+		expect(JSON.parse(body)).toEqual({ plan: 'abc', confirmDestructive: true });
+	});
+	it('names refusals', async () => {
+		const respond = (status: number, text: string) =>
+			(async () => new Response(text, { status })) as unknown as typeof fetch;
+		await expect(
+			startApply(backend, 't', 'web', 'abc', false, respond(409, 'the plan changed\n'))
+		).rejects.toThrow(new ConflictError('the plan changed'));
+		await expect(
+			startApply(backend, 't', 'web', 'abc', false, respond(403, 'no'))
+		).rejects.toBeInstanceOf(ScopeError);
+	});
+	it('reads a job', async () => {
+		const fetcher = (async () =>
+			new Response(
+				JSON.stringify({ ...job, state: 'failed', error: 'x' })
+			)) as unknown as typeof fetch;
+		expect((await fetchJob(backend, 't', 'j1', fetcher)).state).toBe('failed');
 	});
 });
