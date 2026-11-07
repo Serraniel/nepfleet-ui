@@ -7,6 +7,7 @@
 		beginCodes,
 		fetchAuthStatus,
 		finishCodes,
+		providerLoginUrl,
 		removeCodes,
 		setUp,
 		signIn,
@@ -102,12 +103,14 @@
 {#if status?.signedIn}
 	<p class="muted">Signed in as {status.name}</p>
 	<div class="row">
-		<Button variant="ghost" disabled={busy} onclick={another}>Add a passkey</Button>
+		{#if status.passkeys && !status.external}
+			<Button variant="ghost" disabled={busy} onclick={another}>Add a passkey</Button>
+		{/if}
 		{#if status.totp}
 			<Button variant="ghost" disabled={busy} onclick={() => act(() => removeCodes(backend))}
 				>Turn off sign-in codes</Button
 			>
-		{:else if !codeSetup}
+		{:else if !codeSetup && !status.external}
 			<Button variant="ghost" disabled={busy} onclick={startCodes}>Set up sign-in codes</Button>
 		{/if}
 		<Button variant="ghost" disabled={busy} onclick={() => act(() => signOut(backend))}
@@ -153,9 +156,24 @@
 		<Button variant="primary" type="submit" disabled={busy}>Create a passkey</Button>
 	</form>
 {:else if status}
-	<Button variant="primary" disabled={busy} onclick={() => act(() => signIn(backend))}>
-		{busy ? 'Waiting for your passkey…' : 'Sign in with a passkey'}
-	</Button>
+	{#if status.oidc}
+		<Button
+			variant="primary"
+			disabled={busy}
+			onclick={() => location.assign(providerLoginUrl(backend, location.href))}
+		>
+			Sign in with your identity provider
+		</Button>
+	{/if}
+	{#if status.passkeys}
+		<Button
+			variant={status.oidc ? 'ghost' : 'primary'}
+			disabled={busy}
+			onclick={() => act(() => signIn(backend))}
+		>
+			{busy ? 'Waiting for your passkey…' : 'Sign in with a passkey'}
+		</Button>
+	{/if}
 	<details>
 		<summary>Use a code instead</summary>
 		<form onsubmit={useCode}>

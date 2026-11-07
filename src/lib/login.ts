@@ -8,6 +8,12 @@ export interface AuthStatus {
 	name?: string;
 	/** Whether the signed-in user has sign-in codes on. */
 	totp: boolean;
+	/** Whether an identity provider can sign people in. */
+	oidc: boolean;
+	/** Whether passkeys are on. */
+	passkeys: boolean;
+	/** The signed-in user came through the provider, so can't add a passkey or codes. */
+	external: boolean;
 }
 
 /** A new authenticator's secret, until a code proves it works. Keep it in memory only. */
@@ -121,8 +127,17 @@ export async function fetchAuthStatus(
 		setupNeeded: o.setupNeeded === true,
 		signedIn: o.signedIn === true,
 		name: o.name,
-		totp: o.totp === true
+		totp: o.totp === true,
+		oidc: o.oidc === true,
+		// Backends from before this field only had passkeys.
+		passkeys: o.passkeys !== false,
+		external: o.external === true
 	};
+}
+
+/** Where to send the browser to sign in through the identity provider. */
+export function providerLoginUrl(backend: Backend, returnTo: string): string {
+	return `${backend.url}/api/v1/auth/oidc/login?return=${encodeURIComponent(returnTo)}`;
 }
 
 /** Signs in with a code from an authenticator app, when no passkey is at hand. */
