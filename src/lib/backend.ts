@@ -321,8 +321,40 @@ export class ConflictError extends Error {}
 /** The token's scope does not allow this. */
 export class ScopeError extends Error {}
 
+/** Starts a job with a POST to a stack; 202 is the only success. */
+async function postJob(
+	backend: Backend,
+	token: string,
+	stack: string,
+	action: 'apply' | 'rollback',
+	body: unknown,
+	fetcher: typeof fetch,
+	timeoutMs: number
+): Promise<Job> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/${action}`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`
+		},
+		body: JSON.stringify(body)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError('This token may only read. This needs one with the apply scope.');
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
+	const job: unknown = await res.json();
+	if (!isJob(job)) throw new Error('Unexpected response');
+	return job;
+}
+
 /** Starts applying the reviewed plan; the job runs in the background. */
-export async function startApply(
+export function startApply(
 	backend: Backend,
 	token: string,
 	stack: string,
@@ -331,26 +363,36 @@ export async function startApply(
 	fetcher: typeof fetch = fetch,
 	timeoutMs = 60000
 ): Promise<Job> {
-	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/apply`, {
-		method: 'POST',
-		signal: AbortSignal.timeout(timeoutMs),
-		headers: {
-			Accept: 'application/json',
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify({ plan: planId, confirmDestructive })
-	});
-	if (res.status === 401) throw new AuthError('The backend refused the token');
-	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
-	if (res.status === 403)
-		throw new ScopeError('This token may only read. Applying needs one with the apply scope.');
-	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
-	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
-	const body: unknown = await res.json();
-	if (!isJob(body)) throw new Error('Unexpected response');
-	return body;
+	return postJob(
+		backend,
+		token,
+		stack,
+		'apply',
+		{ plan: planId, confirmDestructive },
+		fetcher,
+		timeoutMs
+	);
+}
+
+/** Starts rolling a stack back to a commit from its history. */
+export function startRollback(
+	backend: Backend,
+	token: string,
+	stack: string,
+	commit: string,
+	confirmDestructive: boolean,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<Job> {
+	return postJob(
+		backend,
+		token,
+		stack,
+		'rollback',
+		{ commit, confirmDestructive },
+		fetcher,
+		timeoutMs
+	);
 }
 
 /** A job's state and log so far. */

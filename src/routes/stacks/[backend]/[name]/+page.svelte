@@ -11,7 +11,8 @@
 		fetchHistory,
 		fetchJob,
 		fetchPlan,
-		startApply
+		startApply,
+		startRollback
 	} from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
@@ -87,6 +88,44 @@
 	const destructive = $derived((planValue?.destructive?.length ?? 0) > 0);
 	const running = $derived(job?.state === 'running');
 	const canConfirm = $derived(!starting && (!destructive || typed === name));
+
+	// Rolling back: the backend only learns whether it is destructive once it has
+	// planned the old version, so the first try is unconfirmed, and a refusal
+	// offers a second one that needs the stack's name.
+	let rollbackOpen = $state(false);
+	let rollbackTo = $state<HistoryEntry | null>(null);
+	let rollbackConfirm = $state(false);
+	let lastRollback = $state<HistoryEntry | null>(null);
+	const canRollback = $derived(!starting && (!rollbackConfirm || typed === name));
+	const rollbackRefused = $derived(
+		job?.kind === 'rollback' && job.state === 'failed' && /destructive/i.test(job.error ?? '')
+	);
+
+	function askRollback(h: HistoryEntry, confirm = false) {
+		rollbackTo = h;
+		rollbackConfirm = confirm;
+		typed = '';
+		applyError = '';
+		rollbackOpen = true;
+	}
+
+	async function rollback() {
+		if (!backend || !token || !rollbackTo) return;
+		starting = true;
+		applyError = '';
+		try {
+			lastRollback = rollbackTo;
+			job = await startRollback(backend, token, name, rollbackTo.commit, rollbackConfirm);
+			pollError = '';
+			rollbackOpen = false;
+			void follow(job.id);
+		} catch (e) {
+			applyError = e instanceof Error ? e.message : String(e);
+			if (e instanceof ConflictError) void loadHistory();
+		} finally {
+			starting = false;
+		}
+	}
 
 	function askApply() {
 		typed = '';
@@ -232,14 +271,22 @@
 
 	{#if job}
 		<section aria-labelledby="job-h">
-			<h2 id="job-h">Apply</h2>
+			<h2 id="job-h">{job.kind === 'rollback' ? 'Rollback' : 'Apply'}</h2>
 			<p role="status" class:error={job.state === 'failed'}>
-				{#if job.state === 'running'}Running…{:else if job.state === 'succeeded'}Applied.{:else}Failed:
+				{#if job.state === 'running'}Running…{:else if job.state === 'succeeded'}{job.kind ===
+					'rollback'
+						? 'Rolled back.'
+						: 'Applied.'}{:else}Failed:
 					{job.error}{/if}
 			</p>
 			{#if pollError}<p class="muted" role="status">
 					Lost contact with the backend, still asking: {pollError}
 				</p>{/if}
+			{#if rollbackRefused && lastRollback}
+				{@const retry = lastRollback}
+				<p>Nothing changed. The old version would remove things.</p>
+				<Button onclick={() => askRollback(retry, true)}>Review and roll back anyway…</Button>
+			{/if}
 			<pre class="log">{job.log}</pre>
 		</section>
 	{/if}
@@ -264,13 +311,43 @@
 						<code>{h.commit.slice(0, 7)}</code>
 						<span>{h.subject}</span>
 						<span class="muted">{h.author} · <time datetime={h.date}>{date(h.date)}</time></span>
-						{#if h.applied}<span class="badge">running</span>{/if}
+						{#if h.applied}<span class="badge">running</span>{:else}
+							<Button
+								variant="ghost"
+								onclick={() => askRollback(h)}
+								disabled={running}
+								aria-label="Roll back to {h.commit.slice(0, 7)}">Roll back…</Button
+							>
+						{/if}
 					</li>
 				{/each}
 			</ol>
 		{/if}
 	</section>
 {/if}
+
+<Dialog bind:open={rollbackOpen} title="Roll back {name}?">
+	{#if rollbackTo}
+		<p>
+			Back to <code>{rollbackTo.commit.slice(0, 7)}</code>: {rollbackTo.subject}. The fleet
+			repository gets a new commit, and the stack is applied. Volume data is not rolled back.
+		</p>
+	{/if}
+	{#if rollbackConfirm}
+		<div class="warn">
+			<strong>Destructive:</strong> the old version removes things the running stack has. See the job's
+			message on the page.
+		</div>
+		<TextField label="Type the stack name to confirm" bind:value={typed} autocomplete="off" />
+	{/if}
+	{#if applyError}<p class="error" role="alert">{applyError}</p>{/if}
+	{#snippet actions()}
+		<Button variant="ghost" onclick={() => (rollbackOpen = false)}>Cancel</Button>
+		<Button variant="primary" onclick={rollback} disabled={!canRollback}>
+			{starting ? 'Starting…' : 'Roll back'}
+		</Button>
+	{/snippet}
+</Dialog>
 
 <Dialog bind:open={confirmOpen} title="Apply {name}?">
 	<p>
