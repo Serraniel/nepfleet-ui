@@ -276,7 +276,7 @@ test('rolling back: refused while destructive, then only with the name typed', a
 	await page.getByRole('link', { name: 'photos' }).click();
 
 	// The running version has no button, the older one does.
-	await expect(page.getByText('running')).toBeVisible();
+	await expect(page.getByText('running', { exact: true })).toBeVisible();
 	await page.getByRole('button', { name: 'Roll back to bbbbbbb' }).click();
 	const dialog = page.getByRole('dialog');
 	await expect(dialog).toContainText('Volume data is not rolled back');
