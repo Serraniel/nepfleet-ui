@@ -55,7 +55,8 @@
 				<div class="row">
 					<span class="dot {status?.state ?? 'checking'}" aria-hidden="true"></span>
 					<strong>
-						{status?.state === 'online' ? status.info.name : new URL(backend.url).host}
+						{backend.label ??
+							(status?.state === 'online' ? status.info.name : new URL(backend.url).host)}
 					</strong>
 				</div>
 				<code class="muted">{backend.url}</code>
@@ -70,7 +71,11 @@
 				</p>
 				<div class="row actions">
 					<Button onclick={() => backends.check(backend)}>Recheck</Button>
-					<Button variant="ghost" onclick={() => backends.remove(backend.id)}>Remove</Button>
+					{#if backend.local}
+						<a href="/fleets">Manage in Fleets</a>
+					{:else}
+						<Button variant="ghost" onclick={() => backends.remove(backend.id)}>Remove</Button>
+					{/if}
 				</div>
 			</li>
 		{/each}

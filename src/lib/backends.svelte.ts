@@ -19,8 +19,20 @@ class Backends {
 	list = $state<Backend[]>(load());
 	status = $state<Record<string, Status>>({});
 
+	#localToken = '';
+
 	private save() {
-		localStorage.setItem(KEY, JSON.stringify(this.list));
+		localStorage.setItem(KEY, JSON.stringify(this.list.filter((b) => !b.local)));
+	}
+
+	/** Replaces the remotes the control daemon has connected. */
+	setLocal(remotes: Backend[], token: string) {
+		this.#localToken = token;
+		const gone = this.list.filter((b) => b.local && !remotes.some((r) => r.id === b.id));
+		for (const b of gone) delete this.status[b.id];
+		const known = new Set(this.list.filter((b) => b.local).map((b) => b.id));
+		const same = remotes.length === known.size && remotes.every((r) => known.has(r.id));
+		if (!same) this.list = [...this.list.filter((b) => !b.local), ...remotes];
 	}
 
 	add(input: string): Backend {
@@ -43,7 +55,10 @@ class Backends {
 	async check(backend: Backend) {
 		this.status[backend.id] = { state: 'checking' };
 		try {
-			this.status[backend.id] = { state: 'online', info: await fetchInfo(backend) };
+			this.status[backend.id] = {
+				state: 'online',
+				info: await fetchInfo(backend, fetch, 5000, backend.local ? this.#localToken : undefined)
+			};
 		} catch (e) {
 			const error = e instanceof Error ? e.message : String(e);
 			this.status[backend.id] = { state: 'offline', error };

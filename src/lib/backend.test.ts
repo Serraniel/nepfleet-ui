@@ -151,3 +151,21 @@ describe('startApply', () => {
 		expect((await fetchJob(backend, 't', 'j1', fetcher)).state).toBe('failed');
 	});
 });
+
+describe('fetchInfo with a token', () => {
+	it('sends it and no cookies', async () => {
+		let init: RequestInit = {};
+		const fetcher = (async (_: string, i: RequestInit) => {
+			init = i;
+			return new Response(JSON.stringify({ name: 'n', version: 'v', apiVersion: 'v1' }));
+		}) as unknown as typeof fetch;
+		await fetchInfo(
+			{ id: 'l', url: 'http://127.0.0.1:7481/v1/remotes/nas' },
+			fetcher,
+			5000,
+			'nfc_x'
+		);
+		expect(init.credentials).toBe('omit');
+		expect(new Headers(init.headers).get('Authorization')).toBe('Bearer nfc_x');
+	});
+});
