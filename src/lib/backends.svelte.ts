@@ -36,6 +36,7 @@ class Backends {
 	remove(id: string) {
 		this.list = this.list.filter((b) => b.id !== id);
 		delete this.status[id];
+		sessionStorage.removeItem('nepfleet-token-' + id); // its API token, if kept for this tab
 		this.save();
 	}
 
