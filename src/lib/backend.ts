@@ -87,6 +87,18 @@ function isStack(v: unknown): v is StackInfo {
 	);
 }
 
+/** Stands for a signed-in session where a token would go; the cookie does the work. */
+export const SESSION = 'session';
+
+function authInit(token: string): {
+	credentials: RequestCredentials;
+	headers: Record<string, string>;
+} {
+	return token === SESSION
+		? { credentials: 'include', headers: {} }
+		: { credentials: 'omit', headers: { Authorization: `Bearer ${token}` } };
+}
+
 /** Thrown when the backend refuses the token (401) or locks out (429). */
 export class AuthError extends Error {}
 
@@ -99,7 +111,8 @@ export async function fetchStacks(
 ): Promise<StackInfo[]> {
 	const res = await fetcher(`${backend.url}/api/v1/stacks`, {
 		signal: AbortSignal.timeout(timeoutMs),
-		headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/json', ...authInit(token).headers }
 	});
 	if (res.status === 401) throw new AuthError('The backend refused the token');
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
@@ -123,7 +136,8 @@ async function apiGet<T>(
 ): Promise<T> {
 	const res = await fetcher(`${backend.url}${path}`, {
 		signal: AbortSignal.timeout(timeoutMs),
-		headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/json', ...authInit(token).headers }
 	});
 	if (res.status === 401) throw new AuthError('The backend refused the token');
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
@@ -334,10 +348,11 @@ async function postJob(
 	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/${action}`, {
 		method: 'POST',
 		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
 		headers: {
 			Accept: 'application/json',
 			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
+			...authInit(token).headers
 		},
 		body: JSON.stringify(body)
 	});
