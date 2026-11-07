@@ -3,7 +3,9 @@ import { AuthError, ConflictError } from './backend.ts';
 import {
 	addRemote,
 	describe,
+	fetchEvents,
 	fetchRemotes,
+	markSeen,
 	normalizeDaemonUrl,
 	remoteAction,
 	removeRemote
@@ -74,5 +76,23 @@ group('describe', () => {
 				nepfleetRunning: true
 			})
 		).toBe('Docker 29, 3 containers · swarm manager · NepFleet running');
+	});
+});
+
+group('events', () => {
+	it('reads a page and rejects odd answers', async () => {
+		const a = fake(200, { events: [{ id: 3, title: 't' }], unread: 1, seen: 2 });
+		const page = await fetchEvents(daemon, 't', 2, 500, a.fetcher);
+		expect(page.events[0]?.id).toBe(3);
+		expect(page.unread).toBe(1);
+		expect(a.calls[0]?.url).toBe(daemon + '/v1/events?after=2&limit=500');
+		await expect(
+			fetchEvents(daemon, 't', 0, 500, fake(200, { events: [{ x: 1 }] }).fetcher)
+		).rejects.toThrow(/Unexpected/);
+	});
+	it('marks read', async () => {
+		const a = fake(204);
+		await markSeen(daemon, 't', 9, a.fetcher);
+		expect(a.calls[0]?.init.body).toBe('{"id":9}');
 	});
 });

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AuthError, type Backend } from './backend.ts';
 import { backends } from './backends.svelte.ts';
-import { type Remote, fetchRemotes, normalizeDaemonUrl } from './local.ts';
+import { type Remote, fetchEvents, fetchRemotes, markSeen, normalizeDaemonUrl } from './local.ts';
+import { type FleetEvent, atLeast, loadOsSettings, showOsNotification } from './notifications.ts';
 import { stacks, tokens } from './stacks.svelte.ts';
 
 const URL_KEY = 'nepfleet-control-url';
 const TOKEN_KEY = 'nepfleet-control-token';
+/** How many events the page keeps in memory. */
+const KEEP_EVENTS = 500;
 export const DEFAULT_DAEMON = 'http://127.0.0.1:7481';
 
 /**
@@ -17,6 +20,11 @@ class Local {
 	token = $state('');
 	remotes = $state<Remote[]>([]);
 	error = $state('');
+	events = $state<FleetEvent[]>([]);
+	unread = $state(0);
+	seen = $state(0);
+	eventsError = $state('');
+	#eventsLoaded = false;
 	#timer: ReturnType<typeof setInterval> | undefined;
 
 	constructor() {
@@ -48,6 +56,10 @@ class Local {
 		this.token = '';
 		this.remotes = [];
 		this.error = '';
+		this.events = [];
+		this.unread = 0;
+		this.seen = 0;
+		this.#eventsLoaded = false;
 		sessionStorage.removeItem(TOKEN_KEY);
 		this.sync();
 	}
@@ -63,9 +75,48 @@ class Local {
 			this.remotes = await fetchRemotes(this.url, this.token);
 			this.error = '';
 			this.sync();
+			await this.refreshEvents();
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : String(e);
 			if (e instanceof AuthError) this.disconnect();
+		}
+	}
+
+	/** Brings in new events. What arrives after the first load may notify. */
+	private async refreshEvents() {
+		const last = this.events.at(-1)?.id ?? 0;
+		try {
+			const page = await fetchEvents(this.url, this.token, last);
+			const fresh = page.events;
+			if (fresh.length > 0) this.events = [...this.events, ...fresh].slice(-KEEP_EVENTS);
+			this.unread = page.unread;
+			this.seen = page.seen;
+			this.eventsError = '';
+			if (this.#eventsLoaded) void this.announce(fresh);
+			this.#eventsLoaded = true;
+		} catch (e) {
+			// An older daemon has no events; the rest of the page works regardless.
+			this.eventsError = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	private async announce(fresh: FleetEvent[]) {
+		const s = loadOsSettings();
+		if (!s.enabled) return;
+		for (const e of fresh) {
+			if (atLeast(e.severity, s.minSeverity)) await showOsNotification(e).catch(() => {});
+		}
+	}
+
+	async markAllRead() {
+		const last = this.events.at(-1)?.id;
+		if (!last || !this.connected) return;
+		try {
+			await markSeen(this.url, this.token, last);
+			this.seen = last;
+			this.unread = 0;
+		} catch (e) {
+			this.eventsError = e instanceof Error ? e.message : String(e);
 		}
 	}
 
