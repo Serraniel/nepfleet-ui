@@ -3,6 +3,9 @@
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
+	import { SESSION } from '#lib/backend.ts';
+	import { fetchAuthStatus } from '#lib/login.ts';
+	import BackendSignIn from '#lib/ui/BackendSignIn.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
@@ -18,6 +21,7 @@
 		void local.refresh().then(() => {
 			void backends.checkAll();
 			void stacks.loadAll();
+			for (const b of backends.list) void syncSession(b.id);
 		});
 		local.follow();
 	});
@@ -45,6 +49,17 @@
 					`${r.name} ${r.template ?? ''} ${r.target}`.toLowerCase().includes(query.toLowerCase()))
 		)
 	);
+
+	/** A session (the cookie) replaces a token on that backend. */
+	async function syncSession(id: string) {
+		const b = backends.list.find((x) => x.id === id);
+		if (!b || b.local) return;
+		const s = await fetchAuthStatus(b).catch(() => null);
+		const had = tokens.byBackend[id] === SESSION;
+		if (s?.signedIn) tokens.byBackend[id] = SESSION;
+		else if (had) delete tokens.byBackend[id];
+		await stacks.load(b);
+	}
 
 	function useToken(event: SubmitEvent, id: string) {
 		event.preventDefault();
@@ -79,6 +94,9 @@
 			{@const st = stacks.byBackend[backend.id]}
 			<div class="card">
 				<strong>{backendName(backend.id)}</strong>
+				{#if !backend.local}
+					<BackendSignIn {backend} onchange={() => void syncSession(backend.id)} />
+				{/if}
 				{#if !st || st.state === 'no-token' || (st.state === 'error' && st.auth)}
 					{#if st?.state === 'error'}<p class="error" role="alert">{st.error}</p>{/if}
 					<form onsubmit={(e) => useToken(e, backend.id)}>
@@ -109,7 +127,7 @@
 					<Button onclick={() => stacks.load(backend)}>Retry</Button>
 				{:else}
 					<p class="muted">{st.stacks.length} stacks</p>
-					{#if !backend.local}
+					{#if !backend.local && tokens.byBackend[backend.id] !== SESSION}
 						<Button variant="ghost" onclick={() => forget(backend.id)}>Forget token</Button>
 					{/if}
 				{/if}
