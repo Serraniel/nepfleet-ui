@@ -98,3 +98,32 @@ test('adds a machine, connects it, and its stacks show up', async ({ page }) => 
 	// The token was never put where it outlives the tab.
 	expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('nfc_');
 });
+
+test('in the desktop app it connects by itself', async ({ page }) => {
+	await mockDaemon(page);
+	await page.addInitScript(
+		([url, token]) => {
+			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
+				invoke: async (cmd: string) => {
+					if (cmd !== 'control_start') throw new Error('unexpected command ' + cmd);
+					return { url, token };
+				}
+			};
+		},
+		[DAEMON, TOKEN]
+	);
+	await page.goto('/fleets');
+	await expect(page.getByText('No machines yet')).toBeVisible();
+	await expect(page.getByLabel('Token')).toHaveCount(0);
+});
+
+test('the desktop app says when nepfleet is missing', async ({ page }) => {
+	await page.addInitScript(() => {
+		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
+			invoke: () => Promise.reject('The nepfleet command was not found. Install NepFleet first.')
+		};
+	});
+	await page.goto('/fleets');
+	await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+	await expect(page.getByText('The nepfleet command was not found')).toBeVisible();
+});

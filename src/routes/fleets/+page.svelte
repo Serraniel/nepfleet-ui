@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { isDesktop, startDaemon } from '#lib/desktop.ts';
 	import { DEFAULT_DAEMON, local } from '#lib/local.svelte.ts';
 	import { type Remote, addRemote, describe, remoteAction, removeRemote } from '#lib/local.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -21,10 +22,28 @@
 	let removing = $state<Remote | null>(null);
 	let removeOpen = $state(false);
 
+	const desktop = isDesktop();
+
 	onMount(() => {
 		void local.refresh();
 		local.follow();
+		// The layout connected already, unless that failed: then show why.
+		if (desktop && !local.connected) void connectDesktop();
 	});
+
+	// The desktop app needs no pasted token: it asks the daemon itself.
+	async function connectDesktop() {
+		connecting = true;
+		connectError = '';
+		try {
+			const d = await startDaemon();
+			await local.connect(d.url, d.token, false);
+		} catch (e) {
+			connectError = e instanceof Error ? e.message : String(e);
+		} finally {
+			connecting = false;
+		}
+	}
 
 	async function connectDaemon(event: SubmitEvent) {
 		event.preventDefault();
@@ -106,7 +125,17 @@
 	</p>
 </header>
 
-{#if !local.connected}
+{#if !local.connected && desktop}
+	<section class="card" aria-labelledby="daemon-h">
+		<h2 id="daemon-h">Control daemon</h2>
+		{#if connecting}
+			<p class="muted" aria-live="polite">Starting the control daemon…</p>
+		{:else}
+			{#if connectError}<p class="error" role="alert">{connectError}</p>{/if}
+			<Button variant="primary" onclick={connectDesktop}>Try again</Button>
+		{/if}
+	</section>
+{:else if !local.connected}
 	<section class="card" aria-labelledby="daemon-h">
 		<h2 id="daemon-h">Connect to the control daemon</h2>
 		<p>Start it on this computer, then paste its token:</p>
@@ -136,7 +165,9 @@ nepfleet control token</code
 {:else}
 	<div class="row">
 		<p class="muted">Control daemon at <code>{local.url}</code></p>
-		<Button variant="ghost" onclick={() => local.disconnect()}>Forget token</Button>
+		{#if !desktop}
+			<Button variant="ghost" onclick={() => local.disconnect()}>Forget token</Button>
+		{/if}
 	</div>
 	{#if local.error}<p class="error" role="alert">{local.error}</p>{/if}
 

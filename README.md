@@ -31,3 +31,14 @@ NEPFLEET_BIN=$(go env GOPATH)/bin/nepfleet npm run test:e2e   # UI + real backen
 Architecture, security model and the release process are documented once, in the [backend repository](https://github.com/Serraniel/nepfleet/tree/main/docs). PR titles follow Conventional Commits.
 
 License: [AGPL-3.0-or-later](LICENSE).
+
+## Desktop app
+
+`src-tauri/` wraps this frontend in a [Tauri](https://tauri.app) window for Linux, Windows and macOS. It connects to the local control daemon by itself, so there's no token to paste. Closing the window leaves the daemon and its tunnels running.
+
+```sh
+npm run tauri dev     # needs Rust, and on Linux WebKitGTK 4.1
+npm run tauri build
+```
+
+It needs the `nepfleet` command next to the app or on `PATH`. The window has no shell or file access: its only command is starting the daemon, with fixed arguments.
