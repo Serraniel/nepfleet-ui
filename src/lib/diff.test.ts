@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffLines, stat } from './diff.ts';
+import { diffLines, parseContextDiff, stat } from './diff.ts';
 
 describe('diffLines', () => {
 	it('marks changed lines and keeps line numbers', () => {
@@ -17,5 +17,17 @@ describe('diffLines', () => {
 	it('falls back to a replacement for huge inputs', () => {
 		const big = Array.from({ length: 30 }, (_, i) => `l${i}`).join('\n');
 		expect(stat(diffLines(big, big + '\nz', 10))).toEqual({ added: 31, removed: 30 });
+	});
+});
+
+describe('parseContextDiff', () => {
+	it('reads the backend format', () => {
+		expect(parseContextDiff('  a\n- b\n+ c\n  …\n+ d\n')).toEqual([
+			{ kind: 'same', text: 'a' },
+			{ kind: 'del', text: 'b' },
+			{ kind: 'add', text: 'c' },
+			{ kind: 'gap', text: '…' },
+			{ kind: 'add', text: 'd' }
+		]);
 	});
 });

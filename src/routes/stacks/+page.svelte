@@ -143,7 +143,11 @@
 			<tbody>
 				{#each shown as s (s.backend + '/' + s.name)}
 					<tr>
-						<td><strong>{s.name}</strong></td>
+						<td>
+							<a href="/stacks/{encodeURIComponent(s.backend)}/{encodeURIComponent(s.name)}"
+								><strong>{s.name}</strong></a
+							>
+						</td>
 						<td>{backendName(s.backend)}</td>
 						<td>{s.target}</td>
 						<td>{s.template ?? 'plain compose'}</td>
