@@ -1,17 +1,25 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { page } from '$app/state';
 	import {
 		AuthError,
+		ConflictError,
 		type HistoryEntry,
+		type Job,
+		NotFoundError,
 		type Plan,
 		fetchHistory,
-		fetchPlan
+		fetchJob,
+		fetchPlan,
+		startApply
 	} from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { parseContextDiff } from '#lib/diff.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import Dialog from '#lib/ui/Dialog.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import TextField from '#lib/ui/TextField.svelte';
 
 	type Load<T> =
 		| { state: 'loading' }
@@ -61,6 +69,74 @@
 		void loadHistory();
 		void loadPlan();
 	});
+
+	let confirmOpen = $state(false);
+	let typed = $state('');
+	let starting = $state(false);
+	let applyError = $state('');
+	let job = $state<Job | null>(null);
+	let pollError = $state('');
+	const planValue = $derived(plan.state === 'ok' ? plan.value : null);
+	const destructive = $derived((planValue?.destructive?.length ?? 0) > 0);
+	const running = $derived(job?.state === 'running');
+	const canConfirm = $derived(!starting && (!destructive || typed === name));
+
+	function askApply() {
+		typed = '';
+		applyError = '';
+		confirmOpen = true;
+	}
+
+	async function apply() {
+		if (!backend || !token || !planValue?.id) return;
+		starting = true;
+		applyError = '';
+		try {
+			job = await startApply(backend, token, name, planValue.id, destructive);
+			pollError = '';
+			confirmOpen = false;
+			void follow(job.id);
+		} catch (e) {
+			applyError = e instanceof Error ? e.message : String(e);
+			// The plan on screen is out of date: show the new one to review.
+			if (e instanceof ConflictError) void loadPlan();
+		} finally {
+			starting = false;
+		}
+	}
+
+	let left = false;
+	onDestroy(() => (left = true));
+
+	async function follow(id: string) {
+		const b = backend;
+		const t = token;
+		if (!b || !t) return;
+		while (!left && job?.id === id && job.state === 'running') {
+			await new Promise((r) => setTimeout(r, 2000));
+			if (left) return;
+			try {
+				const next = await fetchJob(b, t, id);
+				if (job?.id !== id) return;
+				job = next;
+				pollError = '';
+			} catch (e) {
+				if (e instanceof NotFoundError) {
+					// The backend restarted and forgot its jobs: the plan tells how it ended.
+					job = {
+						...job,
+						state: 'failed',
+						error: 'The backend no longer knows this job; check the plan below.'
+					};
+					break;
+				}
+				// The apply goes on without us (a restart, the network): keep asking.
+				pollError = e instanceof Error ? e.message : String(e);
+			}
+		}
+		void loadPlan();
+		void loadHistory();
+	}
 
 	const backendLabel = $derived.by(() => {
 		const s = backends.status[backendId];
@@ -136,10 +212,30 @@
 						{/if}
 					</details>
 				{/each}
-				<p class="muted">Apply on the backend with <code>nepfleet apply {name}</code>.</p>
+				{#if p.id}
+					<Button variant="primary" onclick={askApply} disabled={running}>Apply…</Button>
+				{:else}
+					<p class="muted">
+						This backend cannot apply over the API yet. Run <code>nepfleet apply {name}</code> there.
+					</p>
+				{/if}
 			{/if}
 		{/if}
 	</section>
+
+	{#if job}
+		<section aria-labelledby="job-h">
+			<h2 id="job-h">Apply</h2>
+			<p role="status" class:error={job.state === 'failed'}>
+				{#if job.state === 'running'}Running…{:else if job.state === 'succeeded'}Applied.{:else}Failed:
+					{job.error}{/if}
+			</p>
+			{#if pollError}<p class="muted" role="status">
+					Lost contact with the backend, still asking: {pollError}
+				</p>{/if}
+			<pre class="log">{job.log}</pre>
+		</section>
+	{/if}
 
 	<section aria-labelledby="hist-h">
 		<div class="row">
@@ -169,7 +265,39 @@
 	</section>
 {/if}
 
+<Dialog bind:open={confirmOpen} title="Apply {name}?">
+	<p>
+		This applies the plan shown on the page on {backendLabel}. If the fleet changed since, the
+		backend refuses, and you get the new plan to review.
+	</p>
+	{#if destructive}
+		<div class="warn">
+			<strong>Destructive:</strong>
+			<ul>
+				{#each planValue?.destructive ?? [] as d (d)}<li>{d}</li>{/each}
+			</ul>
+		</div>
+		<TextField label="Type the stack name to confirm" bind:value={typed} autocomplete="off" />
+	{/if}
+	{#if applyError}<p class="error" role="alert">{applyError}</p>{/if}
+	{#snippet actions()}
+		<Button variant="ghost" onclick={() => (confirmOpen = false)}>Cancel</Button>
+		<Button variant="primary" onclick={apply} disabled={!canConfirm}>
+			{starting ? 'Starting…' : 'Apply'}
+		</Button>
+	{/snippet}
+</Dialog>
+
 <style>
+	.log {
+		overflow: auto;
+		max-height: 24rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 0.6rem 0.8rem;
+		font-size: 0.85em;
+	}
 	nav,
 	.muted {
 		color: var(--muted);

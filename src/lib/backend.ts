@@ -146,6 +146,8 @@ export interface PlanStep {
 
 /** What GET /api/v1/stacks/{name}/plan returns. */
 export interface Plan {
+	/** Sent back to apply exactly this plan; older backends have none. */
+	id?: string;
 	stack: string;
 	mode: string;
 	first: boolean;
@@ -285,4 +287,81 @@ export function fetchTemplates(
 	timeoutMs = 60000
 ): Promise<SourceCatalogue[]> {
 	return apiGet(backend, token, '/api/v1/templates', isCatalogues, fetcher, timeoutMs);
+}
+
+/** A job on the backend, as POST …/apply and GET /api/v1/jobs/{id} return it. */
+export interface Job {
+	id: string;
+	stack: string;
+	kind: string;
+	state: 'running' | 'succeeded' | 'failed';
+	error?: string;
+	log: string;
+	by: string;
+}
+
+function isJob(v: unknown): v is Job {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return (
+		typeof o.id === 'string' &&
+		typeof o.log === 'string' &&
+		(o.state === 'running' || o.state === 'succeeded' || o.state === 'failed')
+	);
+}
+
+/** The backend refused to start: the plan changed, or another apply runs. */
+export class ConflictError extends Error {}
+
+/** The token's scope does not allow this. */
+export class ScopeError extends Error {}
+
+/** Starts applying the reviewed plan; the job runs in the background. */
+export async function startApply(
+	backend: Backend,
+	token: string,
+	stack: string,
+	planId: string,
+	confirmDestructive: boolean,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<Job> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/apply`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`
+		},
+		body: JSON.stringify({ plan: planId, confirmDestructive })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError('This token may only read. Applying needs one with the apply scope.');
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
+	const body: unknown = await res.json();
+	if (!isJob(body)) throw new Error('Unexpected response');
+	return body;
+}
+
+/** A job's state and log so far. */
+export function fetchJob(
+	backend: Backend,
+	token: string,
+	id: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 10000
+): Promise<Job> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/jobs/${encodeURIComponent(id)}`,
+		isJob,
+		fetcher,
+		timeoutMs
+	);
 }
