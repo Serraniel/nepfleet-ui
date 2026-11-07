@@ -6,6 +6,15 @@ export interface AuthStatus {
 	setupNeeded: boolean;
 	signedIn: boolean;
 	name?: string;
+	/** Whether the signed-in user has sign-in codes on. */
+	totp: boolean;
+}
+
+/** A new authenticator's secret, until a code proves it works. Keep it in memory only. */
+export interface CodeSetup {
+	ceremony: string;
+	secret: string;
+	url: string;
 }
 
 /** The browser's passkey API, passed in so tests can stand in for it. */
@@ -40,7 +49,8 @@ async function post(
 	backend: Backend,
 	path: string,
 	body: unknown,
-	fetcher: typeof fetch
+	fetcher: typeof fetch,
+	refused = 'The backend refused this'
 ): Promise<Response> {
 	const res = await fetcher(`${backend.url}/api/v1/auth/${path}`, {
 		method: 'POST',
@@ -50,7 +60,7 @@ async function post(
 		...(body === undefined ? {} : { body: JSON.stringify(body) })
 	});
 	if (res.status === 429) throw new Error('Too many failed attempts; wait a minute');
-	if (res.status === 401) throw new Error('The backend refused this');
+	if (res.status === 401) throw new Error(refused);
 	if (res.status === 403)
 		throw new Error('This page may not sign in here: check --allowed-origins');
 	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
@@ -107,7 +117,59 @@ export async function fetchAuthStatus(
 	if (res.status === 404) return null;
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
 	const o = (await res.json()) as Partial<AuthStatus>;
-	return { setupNeeded: o.setupNeeded === true, signedIn: o.signedIn === true, name: o.name };
+	return {
+		setupNeeded: o.setupNeeded === true,
+		signedIn: o.signedIn === true,
+		name: o.name,
+		totp: o.totp === true
+	};
+}
+
+/** Signs in with a code from an authenticator app, when no passkey is at hand. */
+export async function signInWithCode(
+	backend: Backend,
+	name: string,
+	code: string,
+	fetcher: typeof fetch = fetch
+): Promise<void> {
+	await post(
+		backend,
+		'totp/login',
+		{ name: name.trim(), code: code.trim() },
+		fetcher,
+		'Wrong name or code, or too many tries for this user'
+	);
+}
+
+export async function beginCodes(
+	backend: Backend,
+	fetcher: typeof fetch = fetch
+): Promise<CodeSetup> {
+	const o = (await (await post(backend, 'totp/begin', undefined, fetcher)).json()) as CodeSetup;
+	if (typeof o.ceremony !== 'string' || typeof o.secret !== 'string' || typeof o.url !== 'string') {
+		throw new Error('Unexpected response');
+	}
+	return o;
+}
+
+/** Turns codes on, once one from the new authenticator proves it works. */
+export async function finishCodes(
+	backend: Backend,
+	ceremonyId: string,
+	code: string,
+	fetcher: typeof fetch = fetch
+): Promise<void> {
+	await post(
+		backend,
+		`totp/finish?ceremony=${encodeURIComponent(ceremonyId)}`,
+		{ code: code.trim() },
+		fetcher,
+		'That code is wrong; check the time on your device, and try again'
+	);
+}
+
+export async function removeCodes(backend: Backend, fetcher: typeof fetch = fetch): Promise<void> {
+	await post(backend, 'totp/remove', undefined, fetcher);
 }
 
 /** Signs in; the session cookie stays out of reach of this page's scripts. */
