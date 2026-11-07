@@ -10,6 +10,7 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 	const remotes: Record<string, unknown>[] = [];
 	const seen: string[] = [];
 	let seenId = 0;
+	const rollbacks: boolean[] = [];
 	await page.route(DAEMON + '/**', async (route: Route) => {
 		const req = route.request();
 		const cors = {
@@ -69,9 +70,35 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 			seenId = (req.postDataJSON() as { id: number }).id;
 			return route.fulfill({ status: 204, headers: cors });
 		}
+		if (path === '/v1/remotes/nas/api/v1/stacks/photos/plan')
+			return json(200, { id: 'p', stack: 'photos', mode: 'compose', first: false, changes: null });
+		if (path === '/v1/remotes/nas/api/v1/stacks/photos/history')
+			return json(200, [
+				{
+					commit: 'a'.repeat(40),
+					date: '2026-11-07T10:00:00Z',
+					author: 'A',
+					subject: 'now',
+					applied: true
+				},
+				{ commit: 'b'.repeat(40), date: '2026-11-06T10:00:00Z', author: 'A', subject: 'before' }
+			]);
+		if (path === '/v1/remotes/nas/api/v1/stacks/photos/rollback') {
+			const confirmed = (req.postDataJSON() as { confirmDestructive: boolean }).confirmDestructive;
+			rollbacks.push(confirmed);
+			return json(202, {
+				id: confirmed ? 'good' : 'refused',
+				stack: 'photos',
+				kind: 'rollback',
+				state: confirmed ? 'succeeded' : 'failed',
+				error: confirmed ? undefined : 'the plan has destructive changes; confirm them to apply',
+				log: 'rolling back\n',
+				by: 'ci'
+			});
+		}
 		return json(404, { error: 'not here' });
 	});
-	return seen;
+	return Object.assign(seen, { rollbacks });
 }
 
 test('adds a machine, connects it, and its stacks show up', async ({ page }) => {
@@ -234,4 +261,36 @@ test('notifications: unread count, list, read, and system notifications only whe
 			)
 		)
 		.toEqual(['nas: loud']);
+});
+
+test('rolling back: refused while destructive, then only with the name typed', async ({ page }) => {
+	const mock = await mockDaemon(page);
+	await page.goto('/fleets');
+	await page.getByLabel('Daemon address').fill(DAEMON);
+	await page.getByLabel('Token').fill(TOKEN);
+	await page.getByRole('button', { name: 'Connect' }).click();
+	await page.getByLabel('SSH address').fill('ssh://me@nas');
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
+	await page.getByRole('button', { name: 'Connect' }).click();
+	await page.getByRole('link', { name: 'Stacks', exact: true }).first().click();
+	await page.getByRole('link', { name: 'photos' }).click();
+
+	// The running version has no button, the older one does.
+	await expect(page.getByText('running')).toBeVisible();
+	await page.getByRole('button', { name: 'Roll back to bbbbbbb' }).click();
+	const dialog = page.getByRole('dialog');
+	await expect(dialog).toContainText('Volume data is not rolled back');
+	await dialog.getByRole('button', { name: 'Roll back', exact: true }).click();
+	await expect(
+		page.getByText('Nothing changed. The old version would remove things.')
+	).toBeVisible();
+	expect(mock.rollbacks).toEqual([false]);
+
+	await page.getByRole('button', { name: 'Review and roll back anyway…' }).click();
+	const confirm = dialog.getByRole('button', { name: 'Roll back', exact: true });
+	await expect(confirm).toBeDisabled();
+	await dialog.getByLabel('Type the stack name to confirm').fill('photos');
+	await confirm.click();
+	await expect(page.getByText('Rolled back.')).toBeVisible();
+	expect(mock.rollbacks).toEqual([false, true]);
 });

@@ -4,6 +4,7 @@ import {
 	ConflictError,
 	ScopeError,
 	startApply,
+	startRollback,
 	fetchJob,
 	NotFoundError,
 	fetchHistory,
@@ -167,5 +168,28 @@ describe('fetchInfo with a token', () => {
 		);
 		expect(init.credentials).toBe('omit');
 		expect(new Headers(init.headers).get('Authorization')).toBe('Bearer nfc_x');
+	});
+});
+
+describe('startRollback', () => {
+	it('sends the commit', async () => {
+		let url = '';
+		let body = '';
+		const fetcher = (async (u: string, init: RequestInit) => {
+			url = u;
+			body = String(init.body);
+			return new Response(JSON.stringify({ id: 'j', state: 'running', log: '' }), { status: 202 });
+		}) as unknown as typeof fetch;
+		const j = await startRollback(
+			{ id: 'b', url: 'https://f.example' },
+			't',
+			'web',
+			'abc',
+			false,
+			fetcher
+		);
+		expect(j.id).toBe('j');
+		expect(url).toBe('https://f.example/api/v1/stacks/web/rollback');
+		expect(JSON.parse(body)).toEqual({ commit: 'abc', confirmDestructive: false });
 	});
 });
