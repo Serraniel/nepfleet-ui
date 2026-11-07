@@ -11,8 +11,32 @@ import {
 	fetchInfo,
 	fetchPlan,
 	fetchStacks,
-	normalizeUrl
+	normalizeUrl,
+	stackPlaces
 } from './backend.ts';
+
+describe('stackPlaces', () => {
+	const stack = { name: 'web', target: 'nas', mode: 'compose', apply: 'manual', updates: 'notify' };
+	it('lists the stack first, then its links', () => {
+		expect(
+			stackPlaces({
+				...stack,
+				url: 'https://web.example.org',
+				links: [{ name: 'Logs in Dozzle', url: 'https://logs.example.org/stack/web' }]
+			}).map((l) => l.name)
+		).toEqual(['Open', 'Logs in Dozzle']);
+		expect(stackPlaces(stack)).toEqual([]);
+	});
+	it('keeps out what could run in this page', () => {
+		const bad = ['javascript:alert(1)', 'data:text/html,x', 'not a url', ''];
+		const links = bad.map((url) => ({ name: 'x', url }));
+		expect(stackPlaces({ ...stack, url: 'javascript:alert(1)', links })).toEqual([]);
+	});
+	it('survives odd entries from a backend', () => {
+		const links = [null, { name: 1, url: 2 }] as unknown as { name: string; url: string }[];
+		expect(stackPlaces({ ...stack, links })).toEqual([]);
+	});
+});
 
 describe('normalizeUrl', () => {
 	it('accepts https and strips trailing slashes', () => {

@@ -8,9 +8,12 @@
 		type Job,
 		NotFoundError,
 		type Plan,
+		type StackLink,
 		fetchHistory,
 		fetchJob,
 		fetchPlan,
+		fetchStacks,
+		stackPlaces,
 		startApply,
 		startRollback
 	} from '#lib/backend.ts';
@@ -64,6 +67,20 @@
 		}
 	}
 
+	let places = $state<StackLink[]>([]);
+
+	/** A nicety: without them, the rest of the page works just the same. */
+	async function loadPlaces() {
+		places = [];
+		if (!backend || !token) return;
+		try {
+			const info = (await fetchStacks(backend, token)).find((s) => s.name === name);
+			places = info ? stackPlaces(info) : [];
+		} catch {
+			places = [];
+		}
+	}
+
 	// Opened directly: remotes through the control daemon aren't listed yet.
 	onMount(() => {
 		void local.refresh();
@@ -76,6 +93,7 @@
 		void token;
 		void loadHistory();
 		void loadPlan();
+		void loadPlaces();
 	});
 
 	let confirmOpen = $state(false);
@@ -194,6 +212,13 @@
 
 <nav aria-label="Breadcrumb"><a href="/stacks">Stacks</a> / {backendLabel}</nav>
 <h1>{name}</h1>
+{#if places.length}
+	<ul class="places" aria-label="Open elsewhere">
+		{#each places as place (place.url)}
+			<li><a href={place.url} target="_blank" rel="noopener noreferrer">{place.name}</a></li>
+		{/each}
+	</ul>
+{/if}
 
 {#if !backend}
 	<EmptyState title="Unknown backend"
@@ -373,6 +398,14 @@
 </Dialog>
 
 <style>
+	.places {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		list-style: none;
+		margin: 0 0 1rem;
+		padding: 0;
+	}
 	.log {
 		overflow: auto;
 		max-height: 24rem;

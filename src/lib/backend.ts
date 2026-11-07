@@ -76,6 +76,31 @@ export interface StackInfo {
 	apply: string;
 	template?: string;
 	updates: string;
+	/** Where its web UI is, if its settings say. */
+	url?: string;
+	/** Other places to look at it, such as its logs. */
+	links?: StackLink[];
+}
+
+export interface StackLink {
+	name: string;
+	url: string;
+}
+
+/**
+ * Where a stack can be opened. A backend's answer goes into an href, so only web
+ * addresses count: a javascript: link would run in this page.
+ */
+export function stackPlaces(s: StackInfo): StackLink[] {
+	const all = [...(s.url ? [{ name: 'Open', url: s.url }] : []), ...(s.links ?? [])];
+	return all.filter((l) => {
+		if (typeof l?.name !== 'string' || typeof l?.url !== 'string') return false;
+		try {
+			return ['http:', 'https:'].includes(new URL(l.url).protocol);
+		} catch {
+			return false;
+		}
+	});
 }
 
 function isStack(v: unknown): v is StackInfo {
