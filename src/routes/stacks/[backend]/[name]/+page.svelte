@@ -72,11 +72,22 @@
 		}
 	}
 
+	// Taking updates: the plan and its apply use newer digests and the template
+	// source's current commit.
+	let takingUpdates = $state(false);
+	function reviewUpdates(on: boolean) {
+		takingUpdates = on;
+		void loadPlan();
+	}
+
 	async function loadPlan() {
 		if (!backend || !token) return;
 		plan = { state: 'loading' };
 		try {
-			plan = { state: 'ok', value: await fetchPlan(backend, token, name) };
+			plan = {
+				state: 'ok',
+				value: await fetchPlan(backend, token, name, fetch, 120000, takingUpdates)
+			};
 		} catch (e) {
 			plan = failed(e);
 		}
@@ -175,7 +186,16 @@
 		starting = true;
 		applyError = '';
 		try {
-			job = await startApply(backend, token, name, planValue.id, destructive);
+			job = await startApply(
+				backend,
+				token,
+				name,
+				planValue.id,
+				destructive,
+				fetch,
+				60000,
+				takingUpdates
+			);
 			pollError = '';
 			confirmOpen = false;
 			void follow(job.id);
@@ -281,10 +301,17 @@
 {:else}
 	<section aria-labelledby="plan-h">
 		<div class="row">
-			<h2 id="plan-h">Pending changes</h2>
+			<h2 id="plan-h">{takingUpdates ? 'Pending changes, taking updates' : 'Pending changes'}</h2>
 			<Button variant="ghost" onclick={loadPlan} disabled={plan.state === 'loading'}>Refresh</Button
 			>
 		</div>
+		{#if takingUpdates}
+			<p class="muted">
+				With newer image digests and the template source's current commit, as
+				<code>apply --update-lock</code>. Review it like any change.
+				<Button variant="ghost" onclick={() => reviewUpdates(false)}>Without updates</Button>
+			</p>
+		{/if}
 		{#if plan.state === 'loading'}
 			<p class="muted" aria-live="polite">Planning… (renders the stack on the backend)</p>
 		{:else if plan.state === 'error'}
@@ -402,6 +429,12 @@
 					</li>
 				{/each}
 			</ul>
+			{#if updates.value.some((u) => u.next || u.rebuilt)}
+				<Button onclick={() => reviewUpdates(true)} disabled={running}
+					>Review and take updates…</Button
+				>
+				<span class="muted">Shows them under Pending changes, to apply from there.</span>
+			{/if}
 		{/if}
 	</section>
 

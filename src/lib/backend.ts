@@ -276,12 +276,14 @@ export function fetchPlan(
 	token: string,
 	stack: string,
 	fetcher: typeof fetch = fetch,
-	timeoutMs = 60000
+	timeoutMs = 60000,
+	/** Plan taking updates: newer image digests and the template source's current commit. */
+	updateLock = false
 ): Promise<Plan> {
 	return apiGet(
 		backend,
 		token,
-		`/api/v1/stacks/${encodeURIComponent(stack)}/plan`,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/plan${updateLock ? '?updateLock=true' : ''}`,
 		isPlan,
 		fetcher,
 		timeoutMs
@@ -474,14 +476,18 @@ export function startApply(
 	planId: string,
 	confirmDestructive: boolean,
 	fetcher: typeof fetch = fetch,
-	timeoutMs = 60000
+	timeoutMs = 60000,
+	/** Apply a plan fetched with updateLock. */
+	updateLock = false
 ): Promise<Job> {
 	return postJob(
 		backend,
 		token,
 		stack,
 		'apply',
-		{ plan: planId, confirmDestructive },
+		updateLock
+			? { plan: planId, confirmDestructive, updateLock }
+			: { plan: planId, confirmDestructive },
 		fetcher,
 		timeoutMs
 	);
