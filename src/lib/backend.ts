@@ -228,6 +228,8 @@ export interface Plan {
 	approximate?: boolean;
 	template?: string;
 	templateFrom?: string;
+	/** Outbound traffic is recorded (log) or limited to what's allowed (enforce). */
+	egress?: 'log' | 'enforce';
 }
 
 function isPlan(v: unknown): v is Plan {
