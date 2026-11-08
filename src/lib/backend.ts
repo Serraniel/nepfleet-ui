@@ -354,6 +354,57 @@ export function fetchUpdates(
 	);
 }
 
+/** A maintenance window as Uptime Kuma lists it. */
+export interface MaintenanceWindow {
+	id: number;
+	title: string;
+	description?: string;
+	strategy: string;
+	active: boolean;
+	/** under-maintenance, scheduled, ended, inactive or unknown */
+	status: string;
+	start?: string;
+	end?: string;
+}
+
+/** One Uptime Kuma of a fleet and its windows, or why they couldn't be read. */
+export interface KumaMaintenance {
+	kuma: string;
+	error?: string;
+	windows: MaintenanceWindow[];
+}
+
+function isMaintenance(v: unknown): v is KumaMaintenance[] {
+	return (
+		Array.isArray(v) &&
+		v.every((k) => {
+			if (typeof k !== 'object' || k === null) return false;
+			const o = k as Record<string, unknown>;
+			return (
+				typeof o.kuma === 'string' &&
+				Array.isArray(o.windows) &&
+				o.windows.every(
+					(w) =>
+						typeof w === 'object' &&
+						w !== null &&
+						typeof (w as Record<string, unknown>).title === 'string' &&
+						typeof (w as Record<string, unknown>).status === 'string'
+				)
+			);
+		})
+	);
+}
+
+/** The maintenance windows of a backend's Uptime Kuma instances. */
+export function fetchMaintenance(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<KumaMaintenance[]> {
+	return apiGet(backend, token, '/api/v1/maintenance', isMaintenance, fetcher, timeoutMs);
+}
+
 /** One template in a source's catalogue (index.json format). */
 export interface TemplateEntry {
 	name: string;
