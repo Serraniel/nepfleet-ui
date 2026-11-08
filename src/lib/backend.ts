@@ -307,6 +307,51 @@ export function fetchHistory(
 	);
 }
 
+/** What the registry has for one image of a stack. */
+export interface ImageUpdate {
+	stack: string;
+	image: string;
+	/** major, minor, patch or digest */
+	track: string;
+	current: string;
+	/** The newest tag the track allows; it comes with a template update. */
+	next?: string;
+	/** A newer tag outside the track. */
+	beyond?: string;
+	/** The tag points at a newer digest than the lock pins. */
+	rebuilt?: boolean;
+	error?: string;
+}
+
+function isUpdates(v: unknown): v is ImageUpdate[] {
+	return (
+		Array.isArray(v) &&
+		v.every((e) => {
+			if (typeof e !== 'object' || e === null) return false;
+			const o = e as Record<string, unknown>;
+			return ['stack', 'image', 'track', 'current'].every((k) => typeof o[k] === 'string');
+		})
+	);
+}
+
+/** Asks the registries what's newer for a stack's images; takes a while. */
+export function fetchUpdates(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 120000
+): Promise<ImageUpdate[]> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/updates`,
+		isUpdates,
+		fetcher,
+		timeoutMs
+	);
+}
+
 /** One template in a source's catalogue (index.json format). */
 export interface TemplateEntry {
 	name: string;
