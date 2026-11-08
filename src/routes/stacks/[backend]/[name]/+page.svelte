@@ -6,6 +6,7 @@
 		ConflictError,
 		type HistoryEntry,
 		type ImageUpdate,
+		type StackEgress,
 		type Job,
 		NotFoundError,
 		type Plan,
@@ -15,6 +16,7 @@
 		fetchPlan,
 		fetchStacks,
 		fetchUpdates,
+		fetchEgress,
 		stackPlaces,
 		stackRelations,
 		startApply,
@@ -69,6 +71,18 @@
 			updates = { state: 'ok', value: await fetchUpdates(backend, token, name) };
 		} catch (e) {
 			updates = failed(e);
+		}
+	}
+
+	// Outbound traffic: what the stack's egress sidecars recorded or refused.
+	let egress = $state<Load<StackEgress> | null>(null);
+	async function loadEgress() {
+		if (!backend || !token) return;
+		egress = { state: 'loading' };
+		try {
+			egress = { state: 'ok', value: await fetchEgress(backend, token, name) };
+		} catch (e) {
+			egress = failed(e);
 		}
 	}
 
@@ -437,6 +451,56 @@
 			{/if}
 		{/if}
 	</section>
+
+	{#if planValue?.egress}
+		<section aria-labelledby="egress-h">
+			<div class="row">
+				<h2 id="egress-h">Outbound traffic</h2>
+				<Button variant="ghost" onclick={loadEgress} disabled={egress?.state === 'loading'}
+					>{egress
+						? 'Check again'
+						: planValue.egress === 'enforce'
+							? 'Show refused'
+							: 'Show where it went'}</Button
+				>
+			</div>
+			{#if egress === null}
+				<p class="muted">
+					{planValue.egress === 'enforce'
+						? 'Only what is allowed gets out. See what was refused, to allow what it needs.'
+						: 'Recorded, not limited. See where it went, to build an allow list.'}
+				</p>
+			{:else if egress.state === 'loading'}
+				<p class="muted">Reading its logs…</p>
+			{:else if egress.state === 'error'}
+				<p class="error" role="alert">{egress.error}</p>
+			{:else if egress.value.sidecars === 0}
+				<p class="muted">
+					Nothing recorded on this backend's host: the stack isn't applied with it yet.
+				</p>
+			{:else if egress.value.hosts.length + egress.value.addresses.length === 0}
+				<p class="muted">
+					{egress.value.mode === 'enforce'
+						? 'Nothing was refused, as far as the logs go back.'
+						: 'It went nowhere that isn’t already allowed.'}
+				</p>
+			{:else}
+				<p>
+					{egress.value.mode === 'enforce' ? 'Refused:' : 'Went to, and not yet allowed:'}
+				</p>
+				<ul class="updates">
+					{#each egress.value.hosts as h (h)}<li><code>{h}</code></li>{/each}
+					{#each egress.value.addresses as a (a)}<li>
+							<code>{a}</code> <span class="muted">no name seen; an address may change</span>
+						</li>{/each}
+				</ul>
+				<p class="muted">
+					Allow what it needs under <code>spec.egress.allow</code> in its stack.yaml;
+					<code>nepfleet egress suggest {name}</code> prints it ready to paste.
+				</p>
+			{/if}
+		</section>
+	{/if}
 
 	<section aria-labelledby="hist-h">
 		<div class="row">

@@ -354,6 +354,47 @@ export function fetchUpdates(
 	);
 }
 
+/** What a stack's egress sidecars recorded (log) or refused (enforce). */
+export interface StackEgress {
+	mode: 'off' | 'log' | 'enforce';
+	/** Sidecars on the backend's host; 0 means nothing is recorded. */
+	sidecars: number;
+	hosts: string[];
+	addresses: string[];
+	lookedUp: string[];
+}
+
+function isEgress(v: unknown): v is StackEgress {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	const strings = (x: unknown) => Array.isArray(x) && x.every((s) => typeof s === 'string');
+	return (
+		typeof o.mode === 'string' &&
+		typeof o.sidecars === 'number' &&
+		strings(o.hosts) &&
+		strings(o.addresses) &&
+		strings(o.lookedUp)
+	);
+}
+
+/** Where a stack's containers went, or what they were refused, less what's allowed. */
+export function fetchEgress(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<StackEgress> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/egress`,
+		isEgress,
+		fetcher,
+		timeoutMs
+	);
+}
+
 /** A maintenance window as Uptime Kuma lists it. */
 export interface MaintenanceWindow {
 	id: number;

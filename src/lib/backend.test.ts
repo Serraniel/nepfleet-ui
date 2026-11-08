@@ -8,6 +8,7 @@ import {
 	fetchJob,
 	NotFoundError,
 	fetchHistory,
+	fetchEgress,
 	fetchMaintenance,
 	fetchUpdates,
 	fetchInfo,
@@ -333,5 +334,28 @@ describe('fetchMaintenance', () => {
 		const odd = (async () =>
 			new Response(JSON.stringify([{ kuma: 'home' }]))) as unknown as typeof fetch;
 		await expect(fetchMaintenance(backend, 't', odd)).rejects.toThrow(/Unexpected/);
+	});
+});
+
+describe('fetchEgress', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads the report, and refuses odd answers', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify({
+					mode: 'enforce',
+					sidecars: 1,
+					hosts: ['api.example.org'],
+					addresses: [],
+					lookedUp: []
+				})
+			)) as unknown as typeof fetch;
+		const e = await fetchEgress(backend, 't', 'web', ok);
+		expect(e.hosts).toEqual(['api.example.org']);
+		const odd = (async () =>
+			new Response(
+				JSON.stringify({ mode: 'log', sidecars: 1, hosts: null })
+			)) as unknown as typeof fetch;
+		await expect(fetchEgress(backend, 't', 'web', odd)).rejects.toThrow(/Unexpected/);
 	});
 });
