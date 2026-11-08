@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	addPasskey,
 	beginCodes,
 	fetchAuthStatus,
 	finishCodes,
@@ -145,5 +146,57 @@ describe('setUp and signOut', () => {
 		expect(JSON.parse(String(f.calls[0]?.init.body))).toEqual({ setupToken: 'tok', name: 'Ada' });
 		await signOut(backend, f.fetcher);
 		expect(f.calls[2]?.url).toContain('/logout');
+	});
+});
+
+describe('addPasskey', () => {
+	const ok = () => new Response(null, { status: 204 });
+	const verifyFirst = () => new Response(JSON.stringify({ verify: true }), { status: 403 });
+	const passkeys = () => {
+		const used: string[] = [];
+		return {
+			used,
+			create: async () => (used.push('create'), { toJSON: () => ({ id: 'new' }) }),
+			get: async () => (used.push('get'), { toJSON: () => ({ id: 'old' }) })
+		};
+	};
+	it('adds straight away after a recent sign-in', async () => {
+		const f = fake({ '/api/v1/auth/passkeys/begin': begun, '/api/v1/auth/passkeys/finish': ok });
+		const p = passkeys();
+		await addPasskey(backend, p, f.fetcher);
+		expect(p.used).toEqual(['create']);
+	});
+	it('verifies with a passkey it has first, when asked, then adds', async () => {
+		let begins = 0;
+		const f = fake({
+			'/api/v1/auth/passkeys/begin': () => (begins++ === 0 ? verifyFirst() : begun()),
+			'/api/v1/auth/passkeys/finish': ok,
+			'/api/v1/auth/verify/begin': begun,
+			'/api/v1/auth/verify/finish': ok
+		});
+		const p = passkeys();
+		await addPasskey(backend, p, f.fetcher);
+		expect(p.used).toEqual(['get', 'create']);
+		expect(f.calls.map((c) => c.url.replace(backend.url, '').split('?')[0])).toEqual([
+			'/api/v1/auth/passkeys/begin',
+			'/api/v1/auth/verify/begin',
+			'/api/v1/auth/verify/finish',
+			'/api/v1/auth/passkeys/begin',
+			'/api/v1/auth/passkeys/finish'
+		]);
+	});
+	it('asks once: a second refusal is shown, not looped', async () => {
+		const f = fake({
+			'/api/v1/auth/passkeys/begin': verifyFirst,
+			'/api/v1/auth/verify/begin': begun,
+			'/api/v1/auth/verify/finish': ok
+		});
+		await expect(addPasskey(backend, passkeys(), f.fetcher)).rejects.toThrow(/Confirm it's you/);
+	});
+	it('keeps the origin message for other refusals', async () => {
+		const f = fake({
+			'/api/v1/auth/passkeys/begin': () => new Response('origin not allowed', { status: 403 })
+		});
+		await expect(addPasskey(backend, passkeys(), f.fetcher)).rejects.toThrow(/allowed-origins/);
 	});
 });

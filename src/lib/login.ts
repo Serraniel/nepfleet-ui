@@ -51,6 +51,14 @@ export function browserPasskeys(): PasskeyApi {
 	};
 }
 
+/** The backend wants a recent proof that it's still the person, by passkey. */
+export class NeedsVerification extends Error {
+	constructor() {
+		super("Confirm it's you with a passkey you have, then try again");
+		this.name = 'NeedsVerification';
+	}
+}
+
 async function post(
 	backend: Backend,
 	path: string,
@@ -67,8 +75,11 @@ async function post(
 	});
 	if (res.status === 429) throw new Error('Too many failed attempts; wait a minute');
 	if (res.status === 401) throw new Error(refused);
-	if (res.status === 403)
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new NeedsVerification();
 		throw new Error('This page may not sign in here: check --allowed-origins');
+	}
 	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
 	return res;
 }
@@ -214,20 +225,25 @@ export function setUp(
 	);
 }
 
-/** Adds this device's passkey for the signed-in user. */
-export function addPasskey(
+/**
+ * Adds this device's passkey for the signed-in user. A sign-in that isn't recent
+ * first proves it's still them, with a passkey they already have, so a stolen
+ * session alone can't add one.
+ */
+export async function addPasskey(
 	backend: Backend,
 	passkeys: PasskeyApi = browserPasskeys(),
 	fetcher: typeof fetch = fetch
 ): Promise<void> {
-	return ceremony(
-		backend,
-		'passkeys/begin',
-		'passkeys/finish',
-		undefined,
-		passkeys.create,
-		fetcher
-	);
+	const add = () =>
+		ceremony(backend, 'passkeys/begin', 'passkeys/finish', undefined, passkeys.create, fetcher);
+	try {
+		await add();
+	} catch (e) {
+		if (!(e instanceof NeedsVerification)) throw e;
+		await ceremony(backend, 'verify/begin', 'verify/finish', undefined, passkeys.get, fetcher);
+		await add();
+	}
 }
 
 export async function signOut(backend: Backend, fetcher: typeof fetch = fetch): Promise<void> {
