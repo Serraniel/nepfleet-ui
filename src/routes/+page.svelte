@@ -44,6 +44,10 @@
 	<Button variant="primary" type="submit">Add backend</Button>
 </form>
 {#if error}<p class="error" role="alert">{error}</p>{/if}
+<p class="muted">
+	A machine you reach over SSH, with or without NepFleet yet, is added on the
+	<a href="/fleets">Fleets</a> page instead.
+</p>
 
 {#if backends.list.length === 0}
 	<EmptyState title="No backends yet">Add one above to see its stacks and hosts.</EmptyState>
