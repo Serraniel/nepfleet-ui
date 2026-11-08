@@ -75,6 +75,9 @@ describe('normalizeUrl', () => {
 		expect(normalizeUrl(' https://fleet.example.org/ ')).toBe('https://fleet.example.org');
 		expect(normalizeUrl('https://example.org/nepfleet//')).toBe('https://example.org/nepfleet');
 	});
+	it('sends an SSH address to the Fleets page', () => {
+		expect(() => normalizeUrl('ssh://me@203.0.113.9')).toThrow(/Fleets page/);
+	});
 	it('allows plain http only on loopback', () => {
 		expect(normalizeUrl('http://localhost:7480')).toBe('http://localhost:7480');
 		expect(() => normalizeUrl('http://192.168.1.2:7480')).toThrow(/https/);

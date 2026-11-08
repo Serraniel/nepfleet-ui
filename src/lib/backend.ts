@@ -34,6 +34,12 @@ export function normalizeUrl(input: string): string {
 	} catch {
 		throw new Error('Not a valid URL');
 	}
+	// A machine over SSH is added on the Fleets page, through the control daemon.
+	if (url.protocol === 'ssh:') {
+		throw new Error(
+			'This is for a NepFleet API address (https://…). To add a machine over SSH, use the Fleets page.'
+		);
+	}
 	if (url.username || url.password) throw new Error('Do not put credentials in the URL');
 	if (url.protocol !== 'https:' && !(url.protocol === 'http:' && LOOPBACK.has(url.hostname))) {
 		throw new Error('Use https:// (plain http is only allowed for localhost)');
