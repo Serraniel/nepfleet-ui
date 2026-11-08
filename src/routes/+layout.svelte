@@ -49,6 +49,10 @@
 				>Templates</a
 			>
 			<a
+				href="/maintenance"
+				aria-current={page.url.pathname === '/maintenance' ? 'page' : undefined}>Maintenance</a
+			>
+			<a
 				href="/notifications"
 				aria-current={page.url.pathname === '/notifications' ? 'page' : undefined}
 				aria-label={local.unread > 0 ? `Notifications, ${local.unread} unread` : 'Notifications'}

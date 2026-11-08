@@ -8,6 +8,7 @@ import {
 	fetchJob,
 	NotFoundError,
 	fetchHistory,
+	fetchMaintenance,
 	fetchUpdates,
 	fetchInfo,
 	fetchPlan,
@@ -302,5 +303,35 @@ describe('taking updates', () => {
 			confirmDestructive: false,
 			updateLock: true
 		});
+	});
+});
+
+describe('fetchMaintenance', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads windows per Kuma, and refuses odd answers', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify([
+					{
+						kuma: 'home',
+						windows: [
+							{
+								id: 1,
+								title: 'NepFleet: update of web',
+								strategy: 'single',
+								active: true,
+								status: 'under-maintenance'
+							}
+						]
+					},
+					{ kuma: 'cloud', error: 'unreachable', windows: [] }
+				])
+			)) as unknown as typeof fetch;
+		const m = await fetchMaintenance(backend, 't', ok);
+		expect(m[0]?.windows[0]?.status).toBe('under-maintenance');
+		expect(m[1]?.error).toBe('unreachable');
+		const odd = (async () =>
+			new Response(JSON.stringify([{ kuma: 'home' }]))) as unknown as typeof fetch;
+		await expect(fetchMaintenance(backend, 't', odd)).rejects.toThrow(/Unexpected/);
 	});
 });
