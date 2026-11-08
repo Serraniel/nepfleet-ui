@@ -268,3 +268,39 @@ describe('fetchUpdates', () => {
 		await expect(fetchUpdates(backend, 't', 'web', odd)).rejects.toThrow(/Unexpected/);
 	});
 });
+
+describe('taking updates', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('plans and applies with updateLock only when asked', async () => {
+		const calls: { url: string; body?: string }[] = [];
+		const fetcher = (async (u: string, init: RequestInit) => {
+			calls.push({ url: u, body: init.body as string | undefined });
+			if (u.endsWith('/apply'))
+				return new Response(
+					JSON.stringify({ id: 'j1', stack: 'web', kind: 'apply', state: 'running', log: '' }),
+					{
+						status: 202
+					}
+				);
+			return new Response(
+				JSON.stringify({ stack: 'web', mode: 'compose', first: false, changes: null })
+			);
+		}) as unknown as typeof fetch;
+		await fetchPlan(backend, 't', 'web', fetcher);
+		await fetchPlan(backend, 't', 'web', fetcher, 1000, true);
+		await startApply(backend, 't', 'web', 'p1', false, fetcher);
+		await startApply(backend, 't', 'web', 'p1', false, fetcher, 1000, true);
+		expect(calls.map((c) => c.url.replace(backend.url, ''))).toEqual([
+			'/api/v1/stacks/web/plan',
+			'/api/v1/stacks/web/plan?updateLock=true',
+			'/api/v1/stacks/web/apply',
+			'/api/v1/stacks/web/apply'
+		]);
+		expect(JSON.parse(calls[2]?.body ?? '{}')).toEqual({ plan: 'p1', confirmDestructive: false });
+		expect(JSON.parse(calls[3]?.body ?? '{}')).toEqual({
+			plan: 'p1',
+			confirmDestructive: false,
+			updateLock: true
+		});
+	});
+});
