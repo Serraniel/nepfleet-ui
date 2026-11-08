@@ -280,6 +280,12 @@
 			{#if p.first}<p>
 					<strong>Not applied yet:</strong> the first apply creates everything below.
 				</p>{/if}
+			{#if p.egress === 'enforce'}<p class="muted">
+					Outbound traffic: only to what's allowed. <code>nepfleet egress suggest {name}</code> lists
+					what was refused.
+				</p>{:else if p.egress === 'log'}<p class="muted">
+					Outbound traffic: recorded, for <code>nepfleet egress suggest {name}</code>.
+				</p>{/if}
 			{#if !p.changes || p.changes.length === 0}
 				<p class="muted">Nothing to apply: the running stack matches the fleet repository.</p>
 			{:else}
