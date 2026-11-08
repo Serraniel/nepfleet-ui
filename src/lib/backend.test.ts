@@ -8,6 +8,7 @@ import {
 	fetchJob,
 	NotFoundError,
 	fetchHistory,
+	fetchUpdates,
 	fetchInfo,
 	fetchPlan,
 	fetchStacks,
@@ -244,5 +245,26 @@ describe('startRollback', () => {
 		expect(j.id).toBe('j');
 		expect(url).toBe('https://f.example/api/v1/stacks/web/rollback');
 		expect(JSON.parse(body)).toEqual({ commit: 'abc', confirmDestructive: false });
+	});
+});
+
+describe('fetchUpdates', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads what the registries have, and refuses odd answers', async () => {
+		let url = '';
+		const fetcher = (async (u: string) => {
+			url = u;
+			return new Response(
+				JSON.stringify([
+					{ stack: 'my web', image: 'nginx', track: 'minor', current: '1.28', next: '1.29' }
+				])
+			);
+		}) as unknown as typeof fetch;
+		const u = await fetchUpdates(backend, 't', 'my web', fetcher);
+		expect(u[0]?.next).toBe('1.29');
+		expect(url).toBe('https://fleet.example.org/api/v1/stacks/my%20web/updates');
+		const odd = (async () =>
+			new Response(JSON.stringify([{ image: 'x' }]))) as unknown as typeof fetch;
+		await expect(fetchUpdates(backend, 't', 'web', odd)).rejects.toThrow(/Unexpected/);
 	});
 });

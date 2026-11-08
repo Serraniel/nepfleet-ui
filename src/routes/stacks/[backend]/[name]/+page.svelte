@@ -5,6 +5,7 @@
 		AuthError,
 		ConflictError,
 		type HistoryEntry,
+		type ImageUpdate,
 		type Job,
 		NotFoundError,
 		type Plan,
@@ -13,6 +14,7 @@
 		fetchJob,
 		fetchPlan,
 		fetchStacks,
+		fetchUpdates,
 		stackPlaces,
 		stackRelations,
 		startApply,
@@ -55,6 +57,18 @@
 			history = { state: 'ok', value: await fetchHistory(backend, token, name) };
 		} catch (e) {
 			history = failed(e);
+		}
+	}
+
+	// Only on request: it asks every image's registry.
+	let updates = $state<Load<ImageUpdate[]> | null>(null);
+	async function loadUpdates() {
+		if (!backend || !token) return;
+		updates = { state: 'loading' };
+		try {
+			updates = { state: 'ok', value: await fetchUpdates(backend, token, name) };
+		} catch (e) {
+			updates = failed(e);
 		}
 	}
 
@@ -358,6 +372,39 @@
 		</section>
 	{/if}
 
+	<section aria-labelledby="upd-h">
+		<div class="row">
+			<h2 id="upd-h">Image updates</h2>
+			<Button variant="ghost" onclick={loadUpdates} disabled={updates?.state === 'loading'}
+				>{updates ? 'Check again' : 'Check for updates'}</Button
+			>
+		</div>
+		{#if updates === null}
+			<p class="muted">Asks each image's registry what's newer than what runs.</p>
+		{:else if updates.state === 'loading'}
+			<p class="muted">Asking the registries…</p>
+		{:else if updates.state === 'error'}
+			<p class="error" role="alert">{updates.error}</p>
+		{:else if updates.value.every((u) => !u.next && !u.beyond && !u.rebuilt && !u.error)}
+			<p class="muted">Every image is up to date within its track.</p>
+		{:else}
+			<ul class="updates">
+				{#each updates.value as u (u.image)}
+					<li>
+						<code>{u.image}:{u.current}</code>
+						{#if u.error}<span class="error">{u.error}</span>{/if}
+						{#if u.next}<span>→ <strong>{u.next}</strong> with the next template update</span>{/if}
+						{#if u.rebuilt}<span>rebuilt since it was pinned: apply with an updated lock</span>{/if}
+						{#if u.beyond}<span class="muted">{u.beyond} is out, beyond the {u.track} track</span
+							>{/if}
+						{#if !u.next && !u.rebuilt && !u.beyond && !u.error}<span class="muted">up to date</span
+							>{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
 	<section aria-labelledby="hist-h">
 		<div class="row">
 			<h2 id="hist-h">History</h2>
@@ -509,9 +556,17 @@
 	.diff .gap {
 		color: var(--muted);
 	}
-	.history {
+	.history,
+	.updates {
 		list-style: none;
 		padding: 0;
+	}
+	.updates li {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		align-items: baseline;
+		padding: 0.25rem 0;
 	}
 	.history li {
 		display: flex;
