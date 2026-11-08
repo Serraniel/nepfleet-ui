@@ -48,6 +48,9 @@
 			<a href="/templates" aria-current={page.url.pathname === '/templates' ? 'page' : undefined}
 				>Templates</a
 			>
+			<a href="/updates" aria-current={page.url.pathname === '/updates' ? 'page' : undefined}
+				>Updates</a
+			>
 			<a
 				href="/maintenance"
 				aria-current={page.url.pathname === '/maintenance' ? 'page' : undefined}>Maintenance</a
