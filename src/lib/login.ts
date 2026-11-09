@@ -246,6 +246,15 @@ export async function addPasskey(
 	}
 }
 
+/** Proves it's still the signed-in person, with a passkey they have; counts for 5 minutes. */
+export function verifyIdentity(
+	backend: Backend,
+	passkeys: PasskeyApi = browserPasskeys(),
+	fetcher: typeof fetch = fetch
+): Promise<void> {
+	return ceremony(backend, 'verify/begin', 'verify/finish', undefined, passkeys.get, fetcher);
+}
+
 export async function signOut(backend: Backend, fetcher: typeof fetch = fetch): Promise<void> {
 	await post(backend, 'logout', undefined, fetcher);
 }

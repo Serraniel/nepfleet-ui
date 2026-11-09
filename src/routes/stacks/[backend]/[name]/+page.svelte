@@ -265,6 +265,9 @@
 
 <nav aria-label="Breadcrumb"><a href="/stacks">Stacks</a> / {backendLabel}</nav>
 <h1>{name}</h1>
+<p>
+	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit">Edit files</a>
+</p>
 {#if places.length}
 	<ul class="places" aria-label="Open elsewhere">
 		{#each places as place (place.url)}
