@@ -1,0 +1,47 @@
+# Maintainer: Serraniel
+# The NepFleet desktop app, built from git. Until it's on the AUR:
+#   cd packaging/arch/nepfleet-desktop-git && makepkg -si
+pkgname=nepfleet-desktop-git
+pkgver=0.1.0.r0.g0000000
+pkgrel=1
+pkgdesc="Desktop app for NepFleet: your fleets, through the local control daemon"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Serraniel/nepfleet-ui"
+license=('AGPL-3.0-or-later')
+# The window starts the local control daemon with the nepfleet command.
+depends=('nepfleet' 'webkit2gtk-4.1' 'gtk3')
+makedepends=('git' 'nodejs' 'npm' 'rust' 'cargo')
+provides=('nepfleet-desktop')
+conflicts=('nepfleet-desktop')
+source=("$pkgname::git+${url}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  git describe --long --tags --abbrev=7 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' ||
+    printf '0.1.0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+build() {
+  cd "$pkgname"
+  npm ci --no-audit --no-fund
+  # Only the binary: the package below installs it, its icon and menu entry.
+  npm run tauri build -- --no-bundle
+}
+
+package() {
+  cd "$pkgname"
+  install -Dm755 src-tauri/target/release/nepfleet-desktop "$pkgdir/usr/bin/nepfleet-desktop"
+  install -Dm644 src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/nepfleet.png"
+  install -Dm644 src-tauri/icons/32x32.png "$pkgdir/usr/share/icons/hicolor/32x32/apps/nepfleet.png"
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/nepfleet.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=NepFleet
+Comment=Manage your fleets
+Exec=nepfleet-desktop
+Icon=nepfleet
+Categories=System;Utility;
+EOF
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

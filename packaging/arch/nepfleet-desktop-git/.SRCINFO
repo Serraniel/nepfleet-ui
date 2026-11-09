@@ -1,0 +1,22 @@
+pkgbase = nepfleet-desktop-git
+	pkgdesc = Desktop app for NepFleet: your fleets, through the local control daemon
+	pkgver = 0.1.0.r0.g0000000
+	pkgrel = 1
+	url = https://github.com/Serraniel/nepfleet-ui
+	arch = x86_64
+	arch = aarch64
+	license = AGPL-3.0-or-later
+	makedepends = git
+	makedepends = nodejs
+	makedepends = npm
+	makedepends = rust
+	makedepends = cargo
+	depends = nepfleet
+	depends = webkit2gtk-4.1
+	depends = gtk3
+	provides = nepfleet-desktop
+	conflicts = nepfleet-desktop
+	source = nepfleet-desktop-git::git+https://github.com/Serraniel/nepfleet-ui.git
+	sha256sums = SKIP
+
+pkgname = nepfleet-desktop-git
