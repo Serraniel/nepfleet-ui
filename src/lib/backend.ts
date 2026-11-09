@@ -88,6 +88,8 @@ export interface StackInfo {
 	links?: StackLink[];
 	/** Values it takes from other stacks: names only, never values. */
 	uses?: StackRef[];
+	/** running, unhealthy, partial or stopped; absent for other hosts, swarm, or not applied. */
+	state?: string;
 }
 
 export interface StackLink {
@@ -140,7 +142,8 @@ function isStack(v: unknown): v is StackInfo {
 	const o = v as Record<string, unknown>;
 	return (
 		['name', 'target', 'mode', 'apply', 'updates'].every((k) => typeof o[k] === 'string') &&
-		(o.template === undefined || typeof o.template === 'string')
+		(o.template === undefined || typeof o.template === 'string') &&
+		(o.state === undefined || typeof o.state === 'string')
 	);
 }
 

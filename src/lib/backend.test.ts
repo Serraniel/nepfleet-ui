@@ -362,3 +362,15 @@ describe('fetchEgress', () => {
 		await expect(fetchEgress(backend, 't', 'web', odd)).rejects.toThrow(/Unexpected/);
 	});
 });
+
+describe('stack state', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const reply = (body: unknown) =>
+		(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch;
+	const base = { name: 'web', target: 'h', mode: 'compose', apply: 'manual', updates: 'notify' };
+	it('passes the state through, and refuses a malformed one', async () => {
+		const s = await fetchStacks(backend, 't', reply([{ ...base, state: 'unhealthy' }]));
+		expect(s[0]?.state).toBe('unhealthy');
+		await expect(fetchStacks(backend, 't', reply([{ ...base, state: 3 }]))).rejects.toThrow();
+	});
+});

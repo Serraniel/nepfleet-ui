@@ -12,6 +12,7 @@
 	let query = $state('');
 	let backendFilter = $state('');
 	let targetFilter = $state('');
+	let stateFilter = $state('');
 	let tokenInput = $state<Record<string, string>>({});
 	let keep = $state<Record<string, boolean>>({});
 	let tokenError = $state<Record<string, string>>({});
@@ -39,12 +40,22 @@
 			return st?.state === 'ok' ? st.stacks.map((s) => ({ ...s, backend: b.id })) : [];
 		})
 	);
+	const stateText: Record<string, string> = {
+		running: 'Running',
+		unhealthy: 'Unhealthy',
+		partial: 'Partly down',
+		stopped: 'Stopped'
+	};
 	const targets = $derived([...new Set(rows.map((r) => r.target))].sort());
 	const shown = $derived(
 		rows.filter(
 			(r) =>
 				(!backendFilter || r.backend === backendFilter) &&
 				(!targetFilter || r.target === targetFilter) &&
+				(!stateFilter ||
+					(stateFilter === 'attention'
+						? ['unhealthy', 'partial', 'stopped'].includes(r.state ?? '')
+						: (r.state ?? 'unknown') === stateFilter)) &&
 				(!query ||
 					`${r.name} ${r.template ?? ''} ${r.target}`.toLowerCase().includes(query.toLowerCase()))
 		)
@@ -148,6 +159,17 @@
 			<option value="">All hosts</option>
 			{#each targets as t (t)}<option value={t}>{t}</option>{/each}
 		</select>
+		<label for="fs" class="sr-only">State</label>
+		<select id="fs" bind:value={stateFilter}>
+			<option value="">Any state</option>
+			<option value="attention">Needs attention</option>
+			<option value="running">Running</option>
+			<option value="unhealthy">Unhealthy</option>
+			<option value="partial">Partly down</option>
+			<option value="stopped">Stopped</option>
+			<option value="unknown">Unknown (other host, swarm, not applied)</option>
+		</select>
+		<a href="/updates">Which have updates?</a>
 	</div>
 
 	{#if shown.length === 0}
@@ -161,6 +183,7 @@
 					<th scope="col">Stack</th>
 					<th scope="col">Backend</th>
 					<th scope="col">Host</th>
+					<th scope="col">State</th>
 					<th scope="col">Template</th>
 					<th scope="col">Mode</th>
 					<th scope="col">Updates</th>
@@ -176,6 +199,7 @@
 						</td>
 						<td>{backendName(s.backend)}</td>
 						<td>{s.target}</td>
+						<td class="state {s.state ?? ''}">{stateText[s.state ?? ''] ?? '—'}</td>
 						<td>{s.template ?? 'plain compose'}</td>
 						<td>{s.mode}</td>
 						<td>{s.updates}</td>
@@ -224,6 +248,11 @@
 		display: flex;
 		gap: 0.4rem;
 		align-items: center;
+	}
+	td.state.unhealthy,
+	td.state.partial,
+	td.state.stopped {
+		color: var(--err);
 	}
 	.filters {
 		display: flex;
