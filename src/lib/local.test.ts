@@ -8,7 +8,11 @@ import {
 	markSeen,
 	normalizeDaemonUrl,
 	remoteAction,
-	removeRemote
+	fetchSetupJob,
+	fetchSetupPlan,
+	removeRemote,
+	setupKind,
+	startSetup
 } from './local.ts';
 
 const daemon = 'http://127.0.0.1:7481';
@@ -94,5 +98,57 @@ group('events', () => {
 		const a = fake(204);
 		await markSeen(daemon, 't', 9, a.fetcher);
 		expect(a.calls[0]?.init.body).toBe('{"id":9}');
+	});
+});
+
+group('setting a machine up', () => {
+	it('knows what a machine needs next', () => {
+		expect(setupKind(undefined)).toBeUndefined();
+		expect(setupKind({ kernel: 'Linux', docker: false })).toBe('bootstrap');
+		expect(setupKind({ kernel: 'Linux', docker: true, dockerRunning: true })).toBe('bootstrap');
+		expect(setupKind({ kernel: 'Linux', docker: true, dockerRunning: true, compose: '2.40' })).toBe(
+			'install'
+		);
+		expect(
+			setupKind({
+				kernel: 'Linux',
+				docker: true,
+				dockerRunning: true,
+				compose: '2.40',
+				nepfleetRunning: true
+			})
+		).toBeUndefined();
+		expect(setupKind({ kernel: 'Darwin' })).toBeUndefined();
+	});
+	it('plans, starts the reviewed plan and follows the job', async () => {
+		const plan = fake(200, {
+			kind: 'install',
+			steps: [{ text: 'pull the image', root: false }],
+			id: 'p1'
+		});
+		const p = await fetchSetupPlan(daemon, 't', 'my vps', 'install', plan.fetcher);
+		expect(p.id).toBe('p1');
+		expect(plan.calls[0]?.url).toBe(daemon + '/v1/remotes/my%20vps/setup?kind=install');
+		const start = fake(202, { kind: 'install', state: 'running', log: '' });
+		await startSetup(daemon, 't', 'vps', 'install', 'p1', start.fetcher);
+		expect(JSON.parse(start.calls[0]?.init.body as string)).toEqual({
+			kind: 'install',
+			plan: 'p1'
+		});
+		const job = fake(200, { kind: 'install', state: 'succeeded', log: '1/1 pull the image\n' });
+		expect((await fetchSetupJob(daemon, 't', 'vps', job.fetcher)).state).toBe('succeeded');
+		await expect(
+			startSetup(
+				daemon,
+				't',
+				'vps',
+				'install',
+				'old',
+				fake(409, { error: 'the plan changed' }).fetcher
+			)
+		).rejects.toBeInstanceOf(ConflictError);
+		await expect(
+			fetchSetupPlan(daemon, 't', 'vps', 'install', fake(200, { kind: 'x' }).fetcher)
+		).rejects.toThrow(/Unexpected/);
 	});
 });

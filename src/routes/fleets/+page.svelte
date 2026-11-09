@@ -2,7 +2,20 @@
 	import { onMount } from 'svelte';
 	import { isDesktop, startDaemon } from '#lib/desktop.ts';
 	import { DEFAULT_DAEMON, local } from '#lib/local.svelte.ts';
-	import { type Remote, addRemote, describe, remoteAction, removeRemote } from '#lib/local.ts';
+	import {
+		type Remote,
+		type SetupJob,
+		type SetupPlan,
+		addRemote,
+		describe,
+		fetchSetupJob,
+		fetchSetupPlan,
+		remoteAction,
+		removeRemote,
+		setupKind,
+		startSetup
+	} from '#lib/local.ts';
+	import { ConflictError } from '#lib/backend.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -108,6 +121,70 @@
 			busy[r.name] = false;
 		}
 	}
+
+	// Setting a machine up: prepare it (Docker), then install NepFleet, each as a
+	// plan the person reviews; then connect.
+	let setupFor = $state<Remote | null>(null);
+	let setupOpen = $state(false);
+	let setupPlan = $state<SetupPlan | null>(null);
+	let setupJob = $state<SetupJob | null>(null);
+	let setupError = $state('');
+	let planning = $state(false);
+
+	async function planSetup(r: Remote) {
+		const kind = setupKind(r.report);
+		setupPlan = null;
+		setupError = '';
+		if (!kind) return;
+		planning = true;
+		try {
+			setupPlan = await fetchSetupPlan(local.url, local.token, r.name, kind);
+		} catch (e) {
+			setupError = e instanceof Error ? e.message : String(e);
+		} finally {
+			planning = false;
+		}
+	}
+
+	function openSetup(r: Remote) {
+		setupFor = r;
+		setupJob = null;
+		setupOpen = true;
+		void planSetup(r);
+	}
+
+	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	async function runSetup() {
+		const r = setupFor;
+		const p = setupPlan;
+		if (!r || !p?.id) return;
+		setupError = '';
+		try {
+			setupJob = await startSetup(local.url, local.token, r.name, p.kind, p.id);
+			while (setupJob.state === 'running') {
+				await sleep(2000);
+				setupJob = await fetchSetupJob(local.url, local.token, r.name);
+			}
+			await local.refresh();
+			const fresh = local.remotes.find((x) => x.name === r.name);
+			if (fresh) setupFor = fresh;
+			// After preparing, installing is next: plan it straight away.
+			if (setupJob.state === 'succeeded' && p.kind === 'bootstrap' && fresh) void planSetup(fresh);
+		} catch (e) {
+			setupError =
+				e instanceof ConflictError
+					? `${e.message}. The plan below is the new one.`
+					: e instanceof Error
+						? e.message
+						: String(e);
+			if (e instanceof ConflictError) void planSetup(r);
+		}
+	}
+
+	const setupRunning = $derived(setupJob?.state === 'running');
+	const setupTitle = (p: SetupPlan | null) =>
+		p?.kind === 'install' ? 'Install NepFleet' : 'Prepare the machine';
 
 	const tunnelText: Record<string, string> = {
 		off: 'Not connected',
@@ -217,6 +294,13 @@ nepfleet control token</code
 						{#if r.tunnel === 'up'}
 							<a href="/stacks">Stacks</a>
 						{/if}
+						{#if setupKind(r.report)}
+							<Button variant="primary" onclick={() => openSetup(r)} disabled={busy[r.name]}
+								>{setupKind(r.report) === 'bootstrap'
+									? 'Prepare this machine…'
+									: 'Install NepFleet…'}</Button
+							>
+						{/if}
 						{#if r.connect}
 							<Button onclick={() => act(r, 'disconnect')} disabled={busy[r.name]}
 								>Disconnect</Button
@@ -241,6 +325,60 @@ nepfleet control token</code
 		</ul>
 	{/if}
 {/if}
+
+<Dialog bind:open={setupOpen} title="{setupTitle(setupPlan)} on {setupFor?.name}">
+	{#if planning}
+		<p class="muted">Looking at the machine…</p>
+	{:else if setupJob && setupJob.state !== 'running' && setupJob.state === 'succeeded' && setupPlan?.kind === 'install' && !setupKind(setupFor?.report)}
+		<p>
+			NepFleet runs on {setupFor?.name}. Back up its age key, which never left the machine: without
+			it, no secret of that fleet can be read.
+		</p>
+		<pre class="log">ssh {setupFor?.address} cat /srv/nepfleet/age.key</pre>
+		<p>Then connect, to manage its stacks from here.</p>
+	{:else if setupPlan}
+		{#if setupPlan.error}<p class="error" role="alert">{setupPlan.error}</p>{/if}
+		{#if setupPlan.steps.length}
+			<p>{setupPlan.error ? 'It would need:' : 'This runs on the machine, in order:'}</p>
+			<ol>
+				{#each setupPlan.steps as s, i (i)}
+					<li>
+						{s.text}{#if s.root}<strong> (as root)</strong>{/if}
+					</li>
+				{/each}
+			</ol>
+		{/if}
+	{/if}
+	{#if setupJob}
+		<p role="status">
+			{setupJob.state === 'running'
+				? 'Running…'
+				: setupJob.state === 'succeeded'
+					? 'Done.'
+					: `Failed: ${setupJob.error ?? ''}`}
+		</p>
+		{#if setupJob.log}<pre class="log">{setupJob.log}</pre>{/if}
+	{/if}
+	{#if setupError}<p class="error" role="alert">{setupError}</p>{/if}
+	{#snippet actions()}
+		<Button variant="ghost" onclick={() => (setupOpen = false)}>
+			{setupRunning ? 'Close (it keeps running)' : 'Close'}
+		</Button>
+		{#if setupFor && !setupKind(setupFor.report) && setupJob?.state === 'succeeded'}
+			<Button
+				variant="primary"
+				onclick={() => {
+					setupOpen = false;
+					if (setupFor) void act(setupFor, 'connect');
+				}}>Connect</Button
+			>
+		{:else if setupPlan?.id && !setupRunning && setupJob?.state !== 'succeeded'}
+			<Button variant="primary" onclick={runSetup}>Run this plan</Button>
+		{:else if setupPlan?.id && setupJob?.state === 'succeeded'}
+			<Button variant="primary" onclick={runSetup}>Run the next plan</Button>
+		{/if}
+	{/snippet}
+</Dialog>
 
 <Dialog bind:open={removeOpen} title="Remove {removing?.name}?">
 	<p>
@@ -328,5 +466,15 @@ nepfleet control token</code
 	}
 	.state.down {
 		color: var(--err);
+	}
+	.log {
+		overflow: auto;
+		max-height: 18rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 0.6rem 0.8rem;
+		font-size: 0.85em;
+		white-space: pre-wrap;
 	}
 </style>

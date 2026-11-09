@@ -146,6 +146,124 @@ export async function removeRemote(
 	);
 }
 
+/** Preparing a machine (Docker, Compose, network) or installing NepFleet on it. */
+export type SetupKind = 'bootstrap' | 'install';
+
+/** One step of a setup; root steps run as root over SSH. */
+export interface SetupStep {
+	text: string;
+	root: boolean;
+}
+
+/** What a setup would do; it runs only with this id. */
+export interface SetupPlan {
+	kind: SetupKind;
+	steps: SetupStep[];
+	id?: string;
+	/** Why it can't run (no root, Docker missing, …). */
+	error?: string;
+}
+
+export interface SetupJob {
+	kind: SetupKind;
+	state: 'running' | 'succeeded' | 'failed';
+	log: string;
+	error?: string;
+}
+
+/** What the machine needs next, from its last check: undefined when NepFleet is there. */
+export function setupKind(r: RemoteReport | undefined): SetupKind | undefined {
+	if (!r || (r.kernel !== undefined && r.kernel !== 'Linux')) return undefined;
+	if (r.nepfleetRunning || r.fleet) return undefined;
+	if (!r.docker || !r.dockerRunning || !r.compose) return 'bootstrap';
+	return 'install';
+}
+
+function isSetupPlan(v: unknown): v is SetupPlan {
+	const o = v as Partial<SetupPlan> | null;
+	return (
+		typeof o === 'object' &&
+		o !== null &&
+		(o.kind === 'bootstrap' || o.kind === 'install') &&
+		Array.isArray(o.steps) &&
+		o.steps.every((s) => typeof s?.text === 'string' && typeof s.root === 'boolean')
+	);
+}
+
+function isSetupJob(v: unknown): v is SetupJob {
+	const o = v as Partial<SetupJob> | null;
+	return (
+		typeof o === 'object' &&
+		o !== null &&
+		(o.state === 'running' || o.state === 'succeeded' || o.state === 'failed') &&
+		typeof o.log === 'string'
+	);
+}
+
+const setupPath = (name: string) => `/v1/remotes/${encodeURIComponent(name)}/setup`;
+
+/** Checks the machine again and plans the setup, changing nothing. */
+export async function fetchSetupPlan(
+	daemon: string,
+	token: string,
+	name: string,
+	kind: SetupKind,
+	fetcher: typeof fetch = fetch
+): Promise<SetupPlan> {
+	const data = await call(
+		daemon,
+		token,
+		'GET',
+		`${setupPath(name)}?kind=${kind}`,
+		undefined,
+		fetcher,
+		90000
+	);
+	if (!isSetupPlan(data)) throw new Error('Unexpected response');
+	return data;
+}
+
+/** Starts the reviewed plan; a ConflictError means it changed: plan again. */
+export async function startSetup(
+	daemon: string,
+	token: string,
+	name: string,
+	kind: SetupKind,
+	planId: string,
+	fetcher: typeof fetch = fetch
+): Promise<SetupJob> {
+	const data = await call(
+		daemon,
+		token,
+		'POST',
+		setupPath(name),
+		{ kind, plan: planId },
+		fetcher,
+		90000
+	);
+	if (!isSetupJob(data)) throw new Error('Unexpected response');
+	return data;
+}
+
+export async function fetchSetupJob(
+	daemon: string,
+	token: string,
+	name: string,
+	fetcher: typeof fetch = fetch
+): Promise<SetupJob> {
+	const data = await call(
+		daemon,
+		token,
+		'GET',
+		`${setupPath(name)}/job`,
+		undefined,
+		fetcher,
+		10000
+	);
+	if (!isSetupJob(data)) throw new Error('Unexpected response');
+	return data;
+}
+
 /** One plain sentence about a machine's Docker and NepFleet. */
 export function describe(r: RemoteReport): string {
 	const parts: string[] = [];
