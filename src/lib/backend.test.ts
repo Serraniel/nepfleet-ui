@@ -3,6 +3,10 @@ import {
 	AuthError,
 	ConflictError,
 	ScopeError,
+	InvalidEditError,
+	VerifyFirstError,
+	fetchStackFiles,
+	saveStackFiles,
 	startApply,
 	startRollback,
 	fetchJob,
@@ -372,5 +376,54 @@ describe('stack state', () => {
 		const s = await fetchStacks(backend, 't', reply([{ ...base, state: 'unhealthy' }]));
 		expect(s[0]?.state).toBe('unhealthy');
 		await expect(fetchStacks(backend, 't', reply([{ ...base, state: 3 }]))).rejects.toThrow();
+	});
+});
+
+describe('editing stack files', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const reply = (status: number, body: unknown) =>
+		(async () =>
+			new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+				status
+			})) as unknown as typeof fetch;
+	it('lists files, and refuses odd answers', async () => {
+		const f = await fetchStackFiles(
+			backend,
+			't',
+			'web',
+			reply(200, [{ path: 'stack.yaml', content: 'x', revision: 'r1' }])
+		);
+		expect(f[0]?.revision).toBe('r1');
+		await expect(fetchStackFiles(backend, 't', 'web', reply(200, [{ path: 1 }]))).rejects.toThrow(
+			/Unexpected/
+		);
+	});
+	it('saves with base revisions, and names each refusal', async () => {
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = init.body as string;
+			return new Response(JSON.stringify({ commit: 'c1' }));
+		}) as unknown as typeof fetch;
+		expect(
+			await saveStackFiles(
+				backend,
+				't',
+				'web',
+				{ 'compose.yaml': 'y' },
+				{ 'compose.yaml': 'r1' },
+				'bump',
+				ok
+			)
+		).toBe('c1');
+		expect(JSON.parse(sent)).toEqual({
+			files: { 'compose.yaml': 'y' },
+			base: { 'compose.yaml': 'r1' },
+			message: 'bump'
+		});
+		const save = (f: typeof fetch) => saveStackFiles(backend, 't', 'web', { a: 'b' }, {}, '', f);
+		await expect(save(reply(403, { verify: true }))).rejects.toBeInstanceOf(VerifyFirstError);
+		await expect(save(reply(403, 'forbidden'))).rejects.toBeInstanceOf(ScopeError);
+		await expect(save(reply(409, 'a file changed'))).rejects.toBeInstanceOf(ConflictError);
+		await expect(save(reply(422, 'not saved: bad'))).rejects.toBeInstanceOf(InvalidEditError);
 	});
 });

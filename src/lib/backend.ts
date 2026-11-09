@@ -201,11 +201,96 @@ async function apiGet<T>(
 	});
 	if (res.status === 401) throw new AuthError('The backend refused the token');
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) throw new ScopeError("This token's scope doesn't cover this");
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
 	const body: unknown = await res.json();
 	if (!validate(body)) throw new Error('Unexpected response');
 	return body;
+}
+
+/** One of a stack's editable files, with the revision to send back when saving. */
+export interface StackFile {
+	path: string;
+	content: string;
+	revision: string;
+}
+
+function isStackFiles(v: unknown): v is StackFile[] {
+	return (
+		Array.isArray(v) &&
+		v.every((f) => {
+			const o = f as Partial<StackFile> | null;
+			return (
+				typeof o?.path === 'string' &&
+				typeof o.content === 'string' &&
+				typeof o.revision === 'string'
+			);
+		})
+	);
+}
+
+/** The stack's editable files (never its encrypted values). */
+export function fetchStackFiles(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<StackFile[]> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/files`,
+		isStackFiles,
+		fetcher,
+		timeoutMs
+	);
+}
+
+/** A person must prove it's still them (a passkey) before changing what runs. */
+export class VerifyFirstError extends Error {}
+/** The stack would no longer load or render; nothing was saved. */
+export class InvalidEditError extends Error {}
+
+/**
+ * Saves changed files in one commit. base holds each changed file's revision as
+ * read ('' for a new file). It doesn't apply: plan and apply afterwards.
+ */
+export async function saveStackFiles(
+	backend: Backend,
+	token: string,
+	stack: string,
+	files: Record<string, string>,
+	base: Record<string, string>,
+	message: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/files`, {
+		method: 'PUT',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify({ files, base, message })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('This token may not change files. That needs one with the edit scope.');
+	}
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown };
+	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
+	return o.commit;
 }
 
 /** One file or image a plan changes; diff is a context diff, secrets masked. */
