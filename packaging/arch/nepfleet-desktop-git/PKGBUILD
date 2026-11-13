@@ -9,7 +9,7 @@ arch=('x86_64' 'aarch64')
 url="https://github.com/Serraniel/nepfleet-ui"
 license=('AGPL-3.0-or-later')
 # The window starts the local control daemon with the nepfleet command.
-depends=('nepfleet' 'webkit2gtk-4.1' 'gtk3')
+depends=('nepfleet' 'webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
 makedepends=('git' 'nodejs' 'npm' 'rust' 'cargo')
 provides=('nepfleet-desktop')
 conflicts=('nepfleet-desktop')

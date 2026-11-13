@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! The desktop shell: a window around the web frontend, connected to the local
 //! control daemon. All logic stays in the daemon and the frontend; closing the
-//! window leaves the daemon and its tunnels running.
+//! window hides it to the tray; the daemon and its tunnels keep running even
+//! after quitting.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
 use std::process::Command;
+
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Manager, WindowEvent};
 
 /// Where the daemon's port for this app listens.
 const DAEMON_ADDR: &str = "127.0.0.1:7481";
@@ -21,7 +26,11 @@ struct Daemon {
 
 /// The nepfleet binary: shipped next to this app, or else on PATH.
 fn nepfleet() -> PathBuf {
-    let name = if cfg!(windows) { "nepfleet.exe" } else { "nepfleet" };
+    let name = if cfg!(windows) {
+        "nepfleet.exe"
+    } else {
+        "nepfleet"
+    };
     if let Ok(exe) = std::env::current_exe() {
         if let Some(sibling) = exe.parent().map(|dir| dir.join(name)) {
             if sibling.exists() {
@@ -59,9 +68,68 @@ fn control_start() -> Result<Daemon, String> {
     })
 }
 
+/// Brings the window back: from the tray, or when the app is started again.
+fn show(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// The tray icon: closing the window only hides it, so the tray is how to get it
+/// back, or to quit. Desktops without a tray start the app again instead.
+fn tray(app: &tauri::App) -> tauri::Result<()> {
+    let open = MenuItem::with_id(app, "open", "Open NepFleet", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let mut builder = TrayIconBuilder::with_id("main")
+        .tooltip("NepFleet")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => show(app),
+            // The daemon and its tunnels keep running: they don't belong to the window.
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
+        // First: a second start shows this window instead of opening another app.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show(app)
+        }))
         .plugin(tauri_plugin_notification::init())
+        .setup(|app| {
+            // Without a tray the app still works: starting it again shows the window.
+            if let Err(e) = tray(app) {
+                eprintln!("nepfleet-desktop: no tray icon: {e}");
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
         .invoke_handler(tauri::generate_handler![control_start])
         .run(tauri::generate_context!())
         .expect("the NepFleet window failed to start");
