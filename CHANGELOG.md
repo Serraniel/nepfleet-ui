@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.0](https://github.com/Serraniel/nepfleet-ui/compare/v0.1.0...v0.2.0) (2026-11-13)
+
+
+### Features
+
+* Arch package for the desktop app ([#68](https://github.com/Serraniel/nepfleet-ui/issues/68)) ([6365c66](https://github.com/Serraniel/nepfleet-ui/commit/6365c665b90d70c3980513d580b5ba67d188da7f))
+* **desktop:** installers for every release, with the nepfleet command inside ([#75](https://github.com/Serraniel/nepfleet-ui/issues/75)) ([92d1321](https://github.com/Serraniel/nepfleet-ui/commit/92d13216a75f79da7fba028205b0666c1a5f76ba))
+* **desktop:** tray icon, and a second start shows the window ([#74](https://github.com/Serraniel/nepfleet-ui/issues/74)) ([b59cdf9](https://github.com/Serraniel/nepfleet-ui/commit/b59cdf935ec488a522d5aac48ab32e8f0143c309))
+* edit a stack's files and save them as a commit ([#70](https://github.com/Serraniel/nepfleet-ui/issues/70)) ([cb4c5fa](https://github.com/Serraniel/nepfleet-ui/commit/cb4c5fa55409b72413802d6e20f3d8a9b30aa340))
+* filter stacks by state ([#71](https://github.com/Serraniel/nepfleet-ui/issues/71)) ([9451ddd](https://github.com/Serraniel/nepfleet-ui/commit/9451dddb9a816453c1633f6813676e7a3460ac78))
+* prepare a machine and install NepFleet from the Fleets page ([#69](https://github.com/Serraniel/nepfleet-ui/issues/69)) ([a645485](https://github.com/Serraniel/nepfleet-ui/commit/a645485bc53e647063f373df1bcaadf0c1e5a0d4))
+
+
+### Bug Fixes
+
+* point SSH addresses to the Fleets page ([#64](https://github.com/Serraniel/nepfleet-ui/issues/64)) ([fce2291](https://github.com/Serraniel/nepfleet-ui/commit/fce2291576a5b21fff8748306061615db5bad5a9))
+
+
+### Dependencies
+
+* Bump node from `c6ad9e9` to `8996bb5` ([#67](https://github.com/Serraniel/nepfleet-ui/issues/67)) ([6c3888b](https://github.com/Serraniel/nepfleet-ui/commit/6c3888b689ecc5d11d54c5220c04af4cb8c43775))
+
 ## 0.1.0 (2026-11-08)
 
 
