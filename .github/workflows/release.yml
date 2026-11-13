@@ -117,3 +117,13 @@ jobs:
           cp source.spdx.json "${name}_${TAG#v}.spdx.json"
           cp source.cdx.json "${name}_${TAG#v}.cdx.json"
           gh release upload "$TAG" "${name}_${TAG#v}.spdx.json" "${name}_${TAG#v}.cdx.json" --clobber -R "$GITHUB_REPOSITORY"
+
+  # Desktop installers with the nepfleet command inside, attached to the release.
+  desktop:
+    permissions:
+      contents: write
+      id-token: write
+    uses: ./.github/workflows/desktop-installers.yml
+    with:
+      ref: ${{ inputs.tag }}
+      upload: true

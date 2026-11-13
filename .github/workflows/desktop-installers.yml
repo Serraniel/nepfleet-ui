@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Desktop installers, with the nepfleet command inside: the app starts the local
+# control daemon with the binary next to it. The binary comes from nepfleet's
+# latest release, checked against its signed checksums first.
+#
+# The release calls this with a tag and upload; pull requests that change the
+# app or this file build the installers without uploading them.
+name: Desktop installers
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Tag or commit to build
+        required: true
+        type: string
+      upload:
+        description: Sign the checksums and attach the installers to the release named by ref
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, cli: linux_amd64, bundles: 'deb,rpm,appimage' }
+          - { os: ubuntu-22.04-arm, cli: linux_arm64, bundles: 'deb,rpm,appimage' }
+          - { os: windows-latest, cli: windows_amd64.exe, bundles: 'msi,nsis' }
+          - { os: macos-latest, cli: darwin_arm64, bundles: 'dmg' }
+          - { os: macos-15-intel, cli: darwin_amd64, bundles: 'dmg' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: write # uploads the installers to the release
+      id-token: write # signs their checksums
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REF: ${{ inputs.ref }}
+      # linuxdeploy is itself an AppImage; runners have no FUSE.
+      APPIMAGE_EXTRACT_AND_RUN: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: npm
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: The nepfleet command, verified
+        env:
+          CLI: ${{ matrix.cli }}
+        run: |
+          mkdir -p cli && cd cli
+          gh release download -R Serraniel/nepfleet -p "nepfleet_*_${CLI}" -p SHA256SUMS -p SHA256SUMS.sigstore.json
+          cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+            --certificate-identity-regexp '^https://github\.com/Serraniel/nepfleet/\.github/workflows/release\.yml@refs/(heads/main|tags/v[0-9.]+)$' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+          file=$(ls nepfleet_*_"${CLI}")
+          want=$(awk -v f="$file" '$2 == f {print $1}' SHA256SUMS)
+          have=$( (sha256sum "$file" 2>/dev/null || shasum -a 256 "$file") | cut -d' ' -f1)
+          [ -n "$want" ] && [ "$want" = "$have" ] || { echo "::error::$file doesn't match SHA256SUMS"; exit 1; }
+          # Tauri expects external binaries named after the target triple.
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          ext=""; [ "${CLI%.exe}" != "$CLI" ] && ext=".exe"
+          mkdir -p ../src-tauri/binaries
+          mv "$file" "../src-tauri/binaries/nepfleet-${triple}${ext}"
+          chmod +x "../src-tauri/binaries/nepfleet-${triple}${ext}"
+          echo "Bundling $file"
+      - run: npm ci
+      - name: Build the installers
+        env:
+          BUNDLES: ${{ matrix.bundles }}
+        run: npx tauri build --bundles "$BUNDLES" --config '{"bundle":{"externalBin":["binaries/nepfleet"]}}'
+      - name: Collect them
+        run: |
+          mkdir -p out
+          find src-tauri/target/release/bundle -maxdepth 2 -type f \
+            \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' \) \
+            -exec cp {} out/ \;
+          ls -l out
+          [ -n "$(ls out)" ] || { echo "::error::no installers were built"; exit 1; }
+      - name: Sign their checksums and attach them to the release
+        if: inputs.upload
+        env:
+          CLI: ${{ matrix.cli }}
+        run: |
+          sums="nepfleet-desktop_${REF#v}_${CLI%.exe}.SHA256SUMS"
+          (cd out && { sha256sum * 2>/dev/null || shasum -a 256 *; } > "../$sums")
+          cosign sign-blob --yes --bundle "$sums.sigstore.json" "$sums"
+          gh release upload "$REF" out/* "$sums" "$sums.sigstore.json" --clobber -R "$GITHUB_REPOSITORY"

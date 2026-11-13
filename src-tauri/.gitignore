@@ -1,2 +1,4 @@
 /target/
 /gen/schemas/
+# The nepfleet command, bundled into release installers.
+/binaries/

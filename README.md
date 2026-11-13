@@ -42,3 +42,25 @@ npm run tauri build
 ```
 
 It needs the `nepfleet` command next to the app or on `PATH`. The window has no shell or file access: its only command is starting the daemon, with fixed arguments.
+
+### Installers
+
+Each release has installers that include the `nepfleet` command, taken from nepfleet's latest release after checking its signed checksums:
+
+| System                       | Files                              |
+| ---------------------------- | ---------------------------------- |
+| Linux (x86-64, arm64)        | `.deb`, `.rpm`, `.AppImage`        |
+| Windows (x86-64)             | `.msi`, `-setup.exe`               |
+| macOS (Apple silicon, Intel) | `.dmg`                             |
+| Arch Linux                   | [`packaging/arch`](packaging/arch) |
+
+Each system's checksums are signed (`*.SHA256SUMS` with a `.sigstore.json` bundle), and can be checked with cosign:
+
+```sh
+cosign verify-blob --bundle nepfleet-desktop_<version>_linux_amd64.SHA256SUMS.sigstore.json \
+  --certificate-identity-regexp '^https://github\.com/Serraniel/nepfleet-ui/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  nepfleet-desktop_<version>_linux_amd64.SHA256SUMS
+```
+
+The installers aren't code-signed yet. So Windows SmartScreen warns about an unknown publisher ("More info", then "Run anyway"). macOS refuses an app from an unknown developer: open it with right-click, Open, or allow it under System Settings, Privacy & Security.
