@@ -34,7 +34,7 @@ License: [AGPL-3.0-or-later](LICENSE).
 
 ## Desktop app
 
-`src-tauri/` wraps this frontend in a [Tauri](https://tauri.app) window for Linux, Windows and macOS. It connects to the local control daemon by itself, so there's no token to paste. Closing the window leaves the daemon and its tunnels running.
+`src-tauri/` wraps this frontend in a [Tauri](https://tauri.app) window for Linux, Windows and macOS. It connects to the local control daemon by itself, so there's no token to paste. Closing the window hides it to the tray icon (Open NepFleet, Quit), and starting the app again brings it back, also on desktops without a tray. The daemon and its tunnels keep running either way, even after quitting.
 
 ```sh
 npm run tauri dev     # needs Rust, and on Linux WebKitGTK 4.1

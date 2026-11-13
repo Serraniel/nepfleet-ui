@@ -14,6 +14,7 @@ pkgbase = nepfleet-desktop-git
 	depends = nepfleet
 	depends = webkit2gtk-4.1
 	depends = gtk3
+	depends = libayatana-appindicator
 	provides = nepfleet-desktop
 	conflicts = nepfleet-desktop
 	source = nepfleet-desktop-git::git+https://github.com/Serraniel/nepfleet-ui.git
