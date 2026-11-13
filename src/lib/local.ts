@@ -322,3 +322,11 @@ export async function markSeen(
 ): Promise<void> {
 	await call(daemon, token, 'POST', '/v1/events/seen', { id }, fetcher, 10000);
 }
+
+/**
+ * Whether there is a NepFleet to connect to: connecting talks to it, so until
+ * the machine is set up, setting it up is what to offer.
+ */
+export function canConnect(r: RemoteReport | undefined): boolean {
+	return !!r && (r.nepfleetRunning === true || !!r.fleet);
+}

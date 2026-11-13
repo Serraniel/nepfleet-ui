@@ -13,6 +13,7 @@
 		remoteAction,
 		removeRemote,
 		setupKind,
+		canConnect,
 		startSetup
 	} from '#lib/local.ts';
 	import { ConflictError } from '#lib/backend.ts';
@@ -305,7 +306,7 @@ nepfleet control token</code
 							<Button onclick={() => act(r, 'disconnect')} disabled={busy[r.name]}
 								>Disconnect</Button
 							>
-						{:else}
+						{:else if canConnect(r.report)}
 							<Button onclick={() => act(r, 'connect')} disabled={busy[r.name]}>Connect</Button>
 						{/if}
 						<Button variant="ghost" onclick={() => act(r, 'refresh')} disabled={busy[r.name]}>
