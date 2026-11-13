@@ -1,34 +1,35 @@
 name: Desktop
 
-# The desktop app builds on every platform it ships for.
+# The desktop app's installers build on every platform they ship for, the same
+# way the release builds them, without uploading anything.
 on:
   pull_request:
-    paths: ['src-tauri/**', 'package.json', 'package-lock.json', '.github/workflows/desktop.yml']
+    paths:
+      - 'src-tauri/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop.yml'
+      - '.github/workflows/desktop-installers.yml'
   push:
     branches: [main]
-    paths: ['src-tauri/**', 'package.json', 'package-lock.json', '.github/workflows/desktop.yml']
+    paths:
+      - 'src-tauri/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop.yml'
+      - '.github/workflows/desktop-installers.yml'
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 26
-          cache: npm
-      - name: Linux libraries
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-      - run: npm ci
-      - run: npx tauri build --no-bundle
+  installers:
+    # The called job asks for these to upload on releases; with upload off,
+    # nothing here writes or signs.
+    permissions:
+      contents: write
+      id-token: write
+    uses: ./.github/workflows/desktop-installers.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      upload: false
