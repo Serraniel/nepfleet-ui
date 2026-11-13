@@ -1,7 +1,9 @@
 import { describe as group, expect, it } from 'vitest';
 import { AuthError, ConflictError } from './backend.ts';
 import {
+	type RemoteReport,
 	addRemote,
+	canConnect,
 	describe,
 	fetchEvents,
 	fetchRemotes,
@@ -150,5 +152,14 @@ group('setting a machine up', () => {
 		await expect(
 			fetchSetupPlan(daemon, 't', 'vps', 'install', fake(200, { kind: 'x' }).fetcher)
 		).rejects.toThrow(/Unexpected/);
+	});
+});
+
+group('canConnect', () => {
+	it('needs a NepFleet on the machine', () => {
+		expect(canConnect(undefined)).toBe(false);
+		expect(canConnect({ kernel: 'Linux', docker: true } as RemoteReport)).toBe(false);
+		expect(canConnect({ kernel: 'Linux', nepfleetRunning: true } as RemoteReport)).toBe(true);
+		expect(canConnect({ kernel: 'Linux', fleet: '/srv/nepfleet' } as RemoteReport)).toBe(true);
 	});
 });
