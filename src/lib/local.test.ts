@@ -163,3 +163,29 @@ group('canConnect', () => {
 		expect(canConnect({ kernel: 'Linux', fleet: '/srv/nepfleet' } as RemoteReport)).toBe(true);
 	});
 });
+
+group('startSetup with a sudo password', () => {
+	it('sends it only when given', async () => {
+		const bodies: string[] = [];
+		const fetcher = (async (_u: string, init: RequestInit) => {
+			bodies.push(String(init.body));
+			return new Response(
+				JSON.stringify({
+					kind: 'bootstrap',
+					state: 'running',
+					log: '',
+					started: '2026-11-13T00:00:00Z'
+				}),
+				{ status: 202 }
+			);
+		}) as unknown as typeof fetch;
+		await startSetup('http://127.0.0.1:7481', 't', 'vps', 'bootstrap', 'p1', fetcher);
+		await startSetup('http://127.0.0.1:7481', 't', 'vps', 'bootstrap', 'p1', fetcher, 'pw');
+		expect(JSON.parse(bodies[0] ?? '{}')).toEqual({ kind: 'bootstrap', plan: 'p1' });
+		expect(JSON.parse(bodies[1] ?? '{}')).toEqual({
+			kind: 'bootstrap',
+			plan: 'p1',
+			sudoPassword: 'pw'
+		});
+	});
+});
