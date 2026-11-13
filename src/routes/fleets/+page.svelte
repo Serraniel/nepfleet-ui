@@ -130,6 +130,12 @@
 	let setupPlan = $state<SetupPlan | null>(null);
 	let setupJob = $state<SetupJob | null>(null);
 	let setupError = $state('');
+	// The sudo password, for one run only: cleared when it starts or the dialog
+	// closes, and never stored.
+	let sudoPassword = $state('');
+	$effect(() => {
+		if (!setupOpen) sudoPassword = '';
+	});
 	let planning = $state(false);
 
 	async function planSetup(r: Remote) {
@@ -161,8 +167,10 @@
 		const p = setupPlan;
 		if (!r || !p?.id) return;
 		setupError = '';
+		const password = p.sudoPassword ? sudoPassword : '';
+		sudoPassword = '';
 		try {
-			setupJob = await startSetup(local.url, local.token, r.name, p.kind, p.id);
+			setupJob = await startSetup(local.url, local.token, r.name, p.kind, p.id, fetch, password);
 			while (setupJob.state === 'running') {
 				await sleep(2000);
 				setupJob = await fetchSetupJob(local.url, local.token, r.name);
@@ -184,6 +192,7 @@
 	}
 
 	const setupRunning = $derived(setupJob?.state === 'running');
+	const needsPassword = $derived(!!setupPlan?.sudoPassword && !setupRunning);
 	const setupTitle = (p: SetupPlan | null) =>
 		p?.kind === 'install' ? 'Install NepFleet' : 'Prepare the machine';
 
@@ -349,6 +358,24 @@ nepfleet control token</code
 				{/each}
 			</ol>
 		{/if}
+		{#if needsPassword && setupPlan.id}
+			<label class="password">
+				Sudo password of {setupFor?.report?.user ?? 'your user'} on {setupFor?.name}
+				<input
+					type="password"
+					autocomplete="off"
+					spellcheck="false"
+					bind:value={sudoPassword}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' && sudoPassword) void runSetup();
+					}}
+				/>
+				<span class="muted"
+					>For the steps marked as root, this run only. It's sent over SSH to sudo on the machine,
+					and kept nowhere.</span
+				>
+			</label>
+		{/if}
 	{/if}
 	{#if setupJob}
 		<p role="status">
@@ -374,9 +401,13 @@ nepfleet control token</code
 				}}>Connect</Button
 			>
 		{:else if setupPlan?.id && !setupRunning && setupJob?.state !== 'succeeded'}
-			<Button variant="primary" onclick={runSetup}>Run this plan</Button>
+			<Button variant="primary" onclick={runSetup} disabled={needsPassword && !sudoPassword}
+				>Run this plan</Button
+			>
 		{:else if setupPlan?.id && setupJob?.state === 'succeeded'}
-			<Button variant="primary" onclick={runSetup}>Run the next plan</Button>
+			<Button variant="primary" onclick={runSetup} disabled={needsPassword && !sudoPassword}
+				>Run the next plan</Button
+			>
 		{/if}
 	{/snippet}
 </Dialog>
@@ -467,6 +498,11 @@ nepfleet control token</code
 	}
 	.state.down {
 		color: var(--err);
+	}
+	.password {
+		display: grid;
+		gap: 0.3rem;
+		margin-top: 0.75rem;
 	}
 	.log {
 		overflow: auto;

@@ -162,6 +162,8 @@ export interface SetupPlan {
 	id?: string;
 	/** Why it can't run (no root, Docker missing, …). */
 	error?: string;
+	/** Its root steps need the sudo password: sudo asks for one there. */
+	sudoPassword?: boolean;
 }
 
 export interface SetupJob {
@@ -230,14 +232,16 @@ export async function startSetup(
 	name: string,
 	kind: SetupKind,
 	planId: string,
-	fetcher: typeof fetch = fetch
+	fetcher: typeof fetch = fetch,
+	/** For this run only: the daemon keeps it nowhere. */
+	sudoPassword = ''
 ): Promise<SetupJob> {
 	const data = await call(
 		daemon,
 		token,
 		'POST',
 		setupPath(name),
-		{ kind, plan: planId },
+		sudoPassword ? { kind, plan: planId, sudoPassword } : { kind, plan: planId },
 		fetcher,
 		90000
 	);
