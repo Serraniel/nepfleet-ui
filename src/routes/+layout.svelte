@@ -26,7 +26,6 @@
 	});
 
 	// Sections arrive with their milestones; listed so the shape of the app is visible.
-	const planned = ['Hosts', 'Updates', 'Tunnels'];
 </script>
 
 <div class="shell">
@@ -73,9 +72,6 @@
 				Notifications
 				{#if local.unread > 0}<span class="count" aria-hidden="true">{local.unread}</span>{/if}
 			</a>
-			{#each planned as item (item)}
-				<span class="planned" title="Planned">{item}</span>
-			{/each}
 		</nav>
 		<footer>
 			<fieldset class="theme">
@@ -155,10 +151,6 @@
 		text-align: center;
 		color: var(--surface);
 		background: var(--text);
-	}
-	.planned {
-		color: var(--muted);
-		cursor: default;
 	}
 	footer {
 		margin-top: auto;
