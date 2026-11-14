@@ -116,6 +116,13 @@
 		padding: 1.25rem 1rem;
 		background: var(--surface);
 		border-right: 1px solid var(--border);
+		/* The window's height, in place while the page scrolls: the footer
+		   stays at the bottom. A very short window scrolls the sidebar itself. */
+		position: sticky;
+		top: 0;
+		height: 100dvh;
+		overflow-y: auto;
+		box-sizing: border-box;
 	}
 	.brand {
 		display: flex;
@@ -214,6 +221,9 @@
 		aside {
 			border-right: 0;
 			border-bottom: 1px solid var(--border);
+			position: static;
+			height: auto;
+			overflow-y: visible;
 		}
 		nav {
 			flex-direction: row;
