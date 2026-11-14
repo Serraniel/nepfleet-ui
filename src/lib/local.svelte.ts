@@ -83,11 +83,21 @@ class Local {
 	}
 
 	/** Brings in new events. What arrives after the first load may notify. */
-	private async refreshEvents() {
+	private refreshEvents(): Promise<void> {
+		// One at a time: two at once read the same last ID and would both add
+		// the same events, which the page lists by ID (it broke with a 500).
+		this.#eventsRun ??= this.loadEvents().finally(() => (this.#eventsRun = null));
+		return this.#eventsRun;
+	}
+
+	#eventsRun: Promise<void> | null = null;
+
+	private async loadEvents() {
 		const last = this.events.at(-1)?.id ?? 0;
 		try {
 			const page = await fetchEvents(this.url, this.token, last);
-			const fresh = page.events;
+			const known = new Set(this.events.map((e) => e.id));
+			const fresh = page.events.filter((e) => !known.has(e.id));
 			if (fresh.length > 0) this.events = [...this.events, ...fresh].slice(-KEEP_EVENTS);
 			this.unread = page.unread;
 			this.seen = page.seen;
