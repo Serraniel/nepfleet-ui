@@ -24,7 +24,10 @@ import {
 	stackRelations,
 	SyncOffError,
 	fetchSync,
-	syncNow
+	syncNow,
+	fetchSecretKeys,
+	setSecret,
+	secretKeyPattern
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -496,5 +499,45 @@ describe('createStack', () => {
 		);
 		await expect(make(reply(409, 'exists'))).rejects.toBeInstanceOf(ConflictError);
 		await expect(make(reply(422, 'not saved: GREETING is required'))).rejects.toThrow(/GREETING/);
+	});
+});
+
+describe('secrets', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('lists keys, sets and removes, and names refusals', async () => {
+		const keys = (async () =>
+			new Response(JSON.stringify({ keys: ['DB_PASSWORD'] }))) as unknown as typeof fetch;
+		expect(await fetchSecretKeys(backend, 't', 'web', keys)).toEqual(['DB_PASSWORD']);
+		const sent: { url: string; method: string; body: unknown }[] = [];
+		const ok = (async (u: string, init: RequestInit) => {
+			sent.push({ url: u, method: init.method ?? '', body: init.body });
+			return new Response(JSON.stringify({ commit: 'c1' }));
+		}) as unknown as typeof fetch;
+		expect(await setSecret(backend, 't', 'web', 'DB_PASSWORD', 'pw', ok)).toBe('c1');
+		await setSecret(backend, 't', '', 'KUMA', null, ok);
+		expect(sent[0]).toEqual({
+			url: 'https://fleet.example.org/api/v1/stacks/web/secrets/DB_PASSWORD',
+			method: 'PUT',
+			body: '{"value":"pw"}'
+		});
+		expect(sent[1]).toMatchObject({
+			url: 'https://fleet.example.org/api/v1/secrets/KUMA',
+			method: 'DELETE',
+			body: undefined
+		});
+		const reply = (status: number, body: unknown) =>
+			(async () =>
+				new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+					status
+				})) as unknown as typeof fetch;
+		await expect(
+			setSecret(backend, 't', 'web', 'K', 'v', reply(403, { verify: true }))
+		).rejects.toBeInstanceOf(VerifyFirstError);
+		await expect(setSecret(backend, 't', '', 'K', 'v', reply(403, 'no'))).rejects.toThrow(/admin/);
+		await expect(setSecret(backend, 't', 'web', 'K', null, reply(404, ''))).rejects.toThrow(
+			/No such secret/
+		);
+		expect(secretKeyPattern.test('DB_PASSWORD')).toBe(true);
+		expect(secretKeyPattern.test('1X')).toBe(false);
 	});
 });
