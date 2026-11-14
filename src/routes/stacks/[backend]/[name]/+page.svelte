@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ProgressBar from '#lib/ui/ProgressBar.svelte';
 	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -440,9 +441,13 @@
 	{#if job}
 		<section aria-labelledby="job-h">
 			<h2 id="job-h">{job.kind === 'rollback' ? 'Rollback' : 'Apply'}</h2>
+			{#if job.state === 'running' && job.progress}
+				<ProgressBar {...job.progress} />
+			{/if}
 			<p role="status" class:error={job.state === 'failed'}>
-				{#if job.state === 'running'}Running…{:else if job.state === 'succeeded'}{job.kind ===
-					'rollback'
+				{#if job.state === 'running'}{#if !job.progress}<Spinner
+							label="Running…"
+						/>{/if}{:else if job.state === 'succeeded'}{job.kind === 'rollback'
 						? 'Rolled back.'
 						: 'Applied.'}{:else}Failed:
 					{job.error}{/if}

@@ -680,11 +680,27 @@ export interface Job {
 	error?: string;
 	log: string;
 	by: string;
+	/** The phase a running apply is in: step of steps, counted from the start. */
+	progress?: { step: number; steps: number; text: string };
+}
+
+function isProgress(v: unknown): v is Job['progress'] {
+	if (typeof v !== 'object' || v === null) return false;
+	const p = v as Record<string, unknown>;
+	return (
+		Number.isInteger(p.step) &&
+		Number.isInteger(p.steps) &&
+		typeof p.text === 'string' &&
+		(p.step as number) >= 1 &&
+		(p.steps as number) >= (p.step as number)
+	);
 }
 
 function isJob(v: unknown): v is Job {
 	if (typeof v !== 'object' || v === null) return false;
 	const o = v as Record<string, unknown>;
+	// A malformed progress is dropped, not the job: the bar is extra.
+	if (o.progress !== undefined && !isProgress(o.progress)) delete o.progress;
 	return (
 		typeof o.id === 'string' &&
 		typeof o.log === 'string' &&
