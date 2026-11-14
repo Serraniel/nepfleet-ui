@@ -41,7 +41,9 @@ import {
 	allowEgress,
 	fetchRendered,
 	startUpdates,
-	backupKey
+	backupKey,
+	fetchMirrors,
+	mirrorNow
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -796,5 +798,25 @@ describe('backupKey', () => {
 		await expect(backupKey(backend, 't', ['age1x'], verify)).rejects.toBeInstanceOf(
 			VerifyFirstError
 		);
+	});
+});
+
+describe('mirrors', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads the status and pushes now', async () => {
+		const list = (async () =>
+			new Response(
+				JSON.stringify([{ url: 'https://***@git.example.org/f.git', error: 'denied' }])
+			)) as unknown as typeof fetch;
+		expect((await fetchMirrors(backend, 't', list))?.[0]?.error).toBe('denied');
+		const old = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+		expect(await fetchMirrors(backend, 't', old)).toBeNull();
+		let method = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			method = init.method ?? '';
+			return new Response(JSON.stringify([{ url: 'x', ok: '2026-01-01T00:00:00Z' }]));
+		}) as unknown as typeof fetch;
+		expect((await mirrorNow(backend, 't', ok))[0]?.ok).toBeTruthy();
+		expect(method).toBe('POST');
 	});
 });

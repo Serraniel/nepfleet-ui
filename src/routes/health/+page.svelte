@@ -4,6 +4,7 @@
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
+	import Mirrors from '#lib/Mirrors.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
@@ -83,6 +84,7 @@
 						</li>
 					{/each}
 				</ul>
+				<Mirrors backend={b} token={tokens.byBackend[b.id] ?? ''} />
 				<h3>Security</h3>
 				{#if r.securityError}
 					<p class="error">The security check couldn't run: {r.securityError}</p>
