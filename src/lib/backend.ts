@@ -1048,6 +1048,49 @@ export async function testChannel(
 	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
 }
 
+/**
+ * Adds or replaces a notification channel (url: a shoutrrr URL, stored
+ * encrypted), or removes it (url null). Committed on the backend; returns
+ * the commit.
+ */
+export async function setChannel(
+	backend: Backend,
+	token: string,
+	channel: string,
+	url: string | null,
+	minSeverity: 'info' | 'warning' | 'error' = 'warning',
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	const res = await fetcher(
+		`${backend.url}/api/v1/notifications/channels/${encodeURIComponent(channel)}`,
+		{
+			method: url === null ? 'DELETE' : 'PUT',
+			signal: AbortSignal.timeout(timeoutMs),
+			credentials: authInit(token).credentials,
+			headers: {
+				Accept: 'application/json',
+				'Content-Type': 'application/json',
+				...authInit(token).headers
+			},
+			body: url === null ? undefined : JSON.stringify({ url, minSeverity })
+		}
+	);
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError('Changing channels needs an admin token, or signing in.');
+	if (res.status === 404 || res.status === 405)
+		throw new NotFoundError(
+			url === null ? 'No such channel' : 'This backend’s NepFleet is too old to change channels.'
+		);
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown };
+	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
+	return o.commit;
+}
+
 /** A CycloneDX SBOM of a stack, or of the fleet's stacks the token sees (stack ''). */
 export async function fetchSBOM(
 	backend: Backend,

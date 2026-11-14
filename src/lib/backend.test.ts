@@ -51,7 +51,8 @@ import {
 	fetchComposeProjects,
 	importCompose,
 	neededScope,
-	scopeMessage
+	scopeMessage,
+	setChannel
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -985,5 +986,44 @@ describe('job progress', () => {
 			expect(j.progress).toBeUndefined();
 			expect(j.id).toBe('j');
 		}
+	});
+});
+
+describe('setChannel', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('PUTs the URL and returns the commit', async () => {
+		let seen: { method?: string; body?: unknown; url?: string } = {};
+		const fetcher = (async (url: string, init: RequestInit) => {
+			seen = {
+				method: init.method,
+				body: init.body ? JSON.parse(init.body as string) : undefined,
+				url
+			};
+			return new Response(JSON.stringify({ commit: 'abc' }));
+		}) as unknown as typeof fetch;
+		expect(await setChannel(backend, 't', 'my phone', 'ntfy://x/y', 'error', fetcher)).toBe('abc');
+		expect(seen.method).toBe('PUT');
+		expect(seen.url).toBe('https://fleet.example.org/api/v1/notifications/channels/my%20phone');
+		expect(seen.body).toEqual({ url: 'ntfy://x/y', minSeverity: 'error' });
+	});
+	it('DELETEs without a body', async () => {
+		let method = '';
+		const fetcher = (async (_u: string, init: RequestInit) => {
+			method = init.method ?? '';
+			expect(init.body).toBeUndefined();
+			return new Response(JSON.stringify({ commit: 'def' }));
+		}) as unknown as typeof fetch;
+		expect(await setChannel(backend, 't', 'phone', null, 'warning', fetcher)).toBe('def');
+		expect(method).toBe('DELETE');
+	});
+	it('says what an old backend or a missing scope means', async () => {
+		const answer = (status: number) =>
+			(async () => new Response('', { status })) as unknown as typeof fetch;
+		await expect(setChannel(backend, 't', 'p', 'ntfy://x', 'warning', answer(405))).rejects.toThrow(
+			'too old'
+		);
+		await expect(setChannel(backend, 't', 'p', 'ntfy://x', 'warning', answer(403))).rejects.toThrow(
+			'admin'
+		);
 	});
 });
