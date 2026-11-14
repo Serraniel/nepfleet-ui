@@ -1,0 +1,18 @@
+pkgbase = nepfleet-native-git
+	pkgdesc = NepFleet desktop app with native Qt controls (prototype)
+	pkgver = r0
+	pkgrel = 1
+	url = https://github.com/Serraniel/nepfleet-ui
+	arch = x86_64
+	arch = aarch64
+	license = AGPL-3.0-or-later
+	makedepends = git
+	makedepends = go
+	depends = nepfleet
+	depends = qt6-base
+	provides = nepfleet-native
+	conflicts = nepfleet-native
+	source = nepfleet-native-git::git+https://github.com/Serraniel/nepfleet-ui.git
+	sha256sums = SKIP
+
+pkgname = nepfleet-native-git

@@ -1,0 +1,43 @@
+# Maintainer: NepFleet contributors
+pkgname=nepfleet-native-git
+pkgver=r0
+pkgrel=1
+pkgdesc='NepFleet desktop app with native Qt controls (prototype)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/Serraniel/nepfleet-ui'
+license=('AGPL-3.0-or-later')
+depends=('nepfleet' 'qt6-base')
+makedepends=('git' 'go')
+provides=('nepfleet-native')
+conflicts=('nepfleet-native')
+source=("$pkgname::git+https://github.com/Serraniel/nepfleet-ui.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+build() {
+  cd "$pkgname/native"
+  export CGO_ENABLED=1 GOFLAGS='-trimpath -buildmode=pie -mod=readonly'
+  # The Qt bindings take several minutes to compile the first time.
+  go build -ldflags '-s -w' -o nepfleet-native .
+}
+
+package() {
+  cd "$pkgname"
+  install -Dm755 native/nepfleet-native "$pkgdir/usr/bin/nepfleet-native"
+  install -Dm644 src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/nepfleet-native.png"
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/nepfleet-native.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=NepFleet (native)
+Comment=Self-hosted fleets from your desktop, with native controls
+Exec=nepfleet-native
+Icon=nepfleet-native
+Categories=Network;System;
+StartupWMClass=nepfleet-native
+DESKTOP
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
