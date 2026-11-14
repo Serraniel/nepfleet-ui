@@ -22,7 +22,8 @@
 		fetchSettings,
 		saveSettings,
 		runDoctor,
-		type DoctorCheck
+		type DoctorCheck,
+		updateOffer
 	} from '#lib/local.ts';
 	import TextField from '#lib/ui/TextField.svelte';
 	import { ConflictError } from '#lib/backend.ts';
@@ -288,9 +289,11 @@
 	const setupTitle = (p: SetupPlan | null) =>
 		p?.kind === 'install'
 			? 'Install NepFleet'
-			: p?.kind === 'mounts'
-				? 'Network mounts'
-				: 'Prepare the machine';
+			: p?.kind === 'update'
+				? 'Update NepFleet'
+				: p?.kind === 'mounts'
+					? 'Network mounts'
+					: 'Prepare the machine';
 
 	// The local fleet repository folder: mounts are planned from its hosts/.
 	let fleetDir = $state('');
@@ -484,6 +487,15 @@ nepfleet control token</code
 							disabled={!!busy[r.name]}
 							busy={busy[r.name] === 'refresh'}>Check again</Button
 						>
+						{#if updateOffer(r.report, local.version)}
+							<Button
+								variant="primary"
+								onclick={() => openSetup(r, 'update')}
+								disabled={!!busy[r.name]}
+								title="This machine runs an older NepFleet than this app"
+								>Update NepFleet to {updateOffer(r.report, local.version)}…</Button
+							>
+						{/if}
 						{#if r.report?.nepfleet || r.report?.nepfleetRunning}
 							<Button
 								onclick={() => checkNepFleet(r)}

@@ -19,7 +19,8 @@ import {
 	setupKind,
 	startSetup,
 	saveSettings,
-	runDoctor
+	runDoctor,
+	updateOffer
 } from './local.ts';
 
 const daemon = 'http://127.0.0.1:7481';
@@ -274,5 +275,24 @@ group('runDoctor', () => {
 				runDoctor('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(body))
 			).rejects.toThrow('Unexpected response');
 		}
+	});
+});
+
+group('updateOffer', () => {
+	const at = (tag: string) => ({ nepfleetImage: `ghcr.io/serraniel/nepfleet:${tag}` });
+	it("offers the daemon's release when the machine runs an older one", () => {
+		expect(updateOffer(at('0.3.1'), 'v0.4.0')).toBe('0.4.0');
+		expect(updateOffer(at('0.3.9'), '0.10.0')).toBe('0.10.0');
+		expect(
+			updateOffer({ nepfleetImage: 'ghcr.io/serraniel/nepfleet:v0.3.1@sha256:abc' }, 'v0.3.4')
+		).toBe('0.3.4');
+	});
+	it('offers nothing otherwise', () => {
+		expect(updateOffer(at('0.4.0'), 'v0.4.0')).toBeNull();
+		expect(updateOffer(at('0.5.0'), 'v0.4.0')).toBeNull();
+		expect(updateOffer(at('edge'), 'v0.4.0')).toBeNull();
+		expect(updateOffer(at('0.3.1'), 'v0.4.0-dev')).toBeNull();
+		expect(updateOffer(undefined, 'v0.4.0')).toBeNull();
+		expect(updateOffer(at('0.3.1'), '')).toBeNull();
 	});
 });

@@ -2,7 +2,14 @@
 import { AuthError, type Backend } from './backend.ts';
 import { backends } from './backends.svelte.ts';
 import { isDesktop, startDaemon } from './desktop.ts';
-import { type Remote, fetchEvents, fetchRemotes, markSeen, normalizeDaemonUrl } from './local.ts';
+import {
+	type Remote,
+	fetchDaemonVersion,
+	fetchEvents,
+	fetchRemotes,
+	markSeen,
+	normalizeDaemonUrl
+} from './local.ts';
 import { type FleetEvent, atLeast, loadOsSettings, showOsNotification } from './notifications.ts';
 import { stacks, tokens } from './stacks.svelte.ts';
 
@@ -30,6 +37,8 @@ class Local {
 	url = $state(DEFAULT_DAEMON);
 	token = $state('');
 	remotes = $state<Remote[]>([]);
+	/** The daemon's version: machines running an older NepFleet can update to it. */
+	version = $state('');
 	error = $state('');
 	events = $state<FleetEvent[]>([]);
 	unread = $state(0);
@@ -92,6 +101,8 @@ class Local {
 			this.remotes = await fetchRemotes(this.url, this.token);
 			this.error = '';
 			this.daemonDown = false;
+			if (!this.version)
+				this.version = await fetchDaemonVersion(this.url, this.token).catch(() => '');
 			this.sync();
 			await this.refreshEvents();
 		} catch (e) {
