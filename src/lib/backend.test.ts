@@ -28,7 +28,9 @@ import {
 	fetchSecretKeys,
 	setSecret,
 	secretKeyPattern,
-	fetchFeatures
+	fetchFeatures,
+	fetchChannels,
+	testChannel
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -556,5 +558,26 @@ describe('fetchFeatures', () => {
 		const odd = (async () =>
 			new Response(JSON.stringify([{ name: 'logs' }]))) as unknown as typeof fetch;
 		await expect(fetchFeatures(backend, 't', odd)).rejects.toThrow(/Unexpected/);
+	});
+});
+
+describe('notification channels', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('lists names, tests one, and passes the reason on', async () => {
+		const list = (async () =>
+			new Response(JSON.stringify({ channels: ['discord'] }))) as unknown as typeof fetch;
+		expect(await fetchChannels(backend, 't', list)).toEqual(['discord']);
+		const old = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+		expect(await fetchChannels(backend, 't', old)).toBeNull();
+		let url = '';
+		const ok = (async (u: string) => {
+			url = u;
+			return new Response(null, { status: 204 });
+		}) as unknown as typeof fetch;
+		await testChannel(backend, 't', 'discord', ok);
+		expect(url).toBe('https://fleet.example.org/api/v1/notifications/channels/discord/test');
+		const bad = (async () =>
+			new Response('sending failed: 401 Unauthorized', { status: 502 })) as unknown as typeof fetch;
+		await expect(testChannel(backend, 't', 'discord', bad)).rejects.toThrow(/401/);
 	});
 });

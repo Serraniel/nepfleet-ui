@@ -8,6 +8,7 @@
 		requestOsPermission,
 		saveOsSettings
 	} from '#lib/notifications.ts';
+	import ChannelTests from '#lib/ChannelTests.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
@@ -106,6 +107,8 @@
 		</ul>
 	{/if}
 {/if}
+
+<ChannelTests />
 
 <style>
 	header p,
