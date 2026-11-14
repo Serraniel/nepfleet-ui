@@ -5,3 +5,5 @@ pkg/
 *-amd64
 *-arm64
 LICENSE-*
+# The source a -git package clones into its folder.
+/*/*-git/
