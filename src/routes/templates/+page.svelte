@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { type SourceCatalogue, type TemplateEntry, fetchTemplates } from '#lib/backend.ts';
+	import { goto } from '$app/navigation';
+	import {
+		type SourceCatalogue,
+		type TemplateEntry,
+		VerifyFirstError,
+		createStack,
+		fetchTemplates
+	} from '#lib/backend.ts';
+	import { verifyIdentity } from '#lib/login.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { STACK_NAME, TYPED, type TemplateInput, checkInput, newCommand } from '#lib/inputs.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
@@ -17,6 +25,12 @@
 	let target = $state('local');
 	let values = $state<Record<string, string>>({});
 	let copied = $state(false);
+	// Secret inputs: sent with Create only, stored encrypted there, and cleared
+	// when the wizard closes. The copied command never holds them.
+	let secretValues = $state<Record<string, string>>({});
+	let access = $state<'domain' | 'port'>('domain');
+	let creating = $state(false);
+	let createError = $state('');
 
 	const withToken = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
 
@@ -63,8 +77,15 @@
 		stackName = e.t.name;
 		target = 'local';
 		values = Object.fromEntries((e.t.inputs ?? []).map((i) => [i.name, i.default ?? '']));
+		secretValues = {};
+		access = 'domain';
+		createError = '';
 		copied = false;
 	}
+
+	$effect(() => {
+		if (!picked) secretValues = {};
+	});
 
 	const inputs = $derived(picked?.t.inputs ?? []);
 	const errors = $derived(
@@ -82,6 +103,44 @@
 		picked ? newCommand(picked.t.name, stackName, target, inputs, values) : ''
 	);
 	const secrets = $derived(inputs.filter((i) => i.type === 'secret'));
+	const secretsMissing = $derived(
+		secrets.some((i) => i.required && !i.default && !secretValues[i.name])
+	);
+
+	async function create() {
+		const b = backends.list.find((x) => x.id === backendId);
+		const token = tokens.byBackend[backendId];
+		if (!b || !token || !picked) return;
+		creating = true;
+		createError = '';
+		const all: Record<string, string> = {};
+		for (const [k, v] of Object.entries(values)) if (v !== '') all[k] = v;
+		for (const [k, v] of Object.entries(secretValues)) if (v !== '') all[k] = v;
+		const req = {
+			template: picked.t.name,
+			source: picked.source,
+			name: stackName,
+			target,
+			access,
+			values: all
+		};
+		try {
+			let res;
+			try {
+				res = await createStack(b, token, req);
+			} catch (e) {
+				if (!(e instanceof VerifyFirstError)) throw e;
+				await verifyIdentity(b);
+				res = await createStack(b, token, req);
+			}
+			secretValues = {};
+			await goto(`/stacks/${encodeURIComponent(backendId)}/${encodeURIComponent(res.name)}`);
+		} catch (e) {
+			createError = e instanceof Error ? e.message : String(e);
+		} finally {
+			creating = false;
+		}
+	}
 
 	function choices(inp: TemplateInput): string[] {
 		if (inp.type === 'bool') return ['true', 'false'];
@@ -154,6 +213,13 @@
 					<input id="f-target" bind:value={target} />
 					<span class="muted">local is the host the command runs on</span>
 				</div>
+				<div class="field">
+					<label for="f-access">Reached</label>
+					<select id="f-access" bind:value={access}>
+						<option value="domain">on its domain, through Caddy</option>
+						<option value="port">on a LAN port of the host (templates with a web UI)</option>
+					</select>
+				</div>
 				{#each inputs as inp (inp.name)}
 					{#if inp.type !== 'secret'}
 						{@const err = errors[inp.name]}
@@ -186,6 +252,24 @@
 								{err || inp.description || ''}
 							</span>
 						</div>
+					{:else}
+						<div class="field">
+							<label for="f-{inp.name}">
+								{inp.title ?? inp.name}{#if inp.required && !inp.default}<span aria-hidden="true">
+										*</span
+									>{/if}
+							</label>
+							<input
+								id="f-{inp.name}"
+								type="password"
+								autocomplete="new-password"
+								bind:value={secretValues[inp.name]}
+								aria-describedby="h-{inp.name}"
+							/>
+							<span id="h-{inp.name}" class="muted">
+								{inp.description ? inp.description + ' ' : ''}Stored encrypted on the backend.
+							</span>
+						</div>
 					{/if}
 				{/each}
 			</form>
@@ -193,9 +277,10 @@
 				<div class="note">
 					{#if secrets.length}
 						<p>
-							<strong>Asked when you run the command:</strong>
-							{secrets.map((s) => s.title ?? s.name).join(', ')}. Secrets never pass through this
-							page.
+							<strong>Secrets:</strong>
+							{secrets.map((s) => s.title ?? s.name).join(', ')}. With Create, they go to the
+							backend and are stored encrypted there. The command below leaves them out: it asks for
+							them when you run it.
 						</p>
 					{/if}
 					{#if t.generate?.length}
@@ -206,11 +291,19 @@
 					{/if}
 				</div>
 			{/if}
-			<h3>Command</h3>
+			<div class="actions">
+				<Button variant="primary" onclick={create} disabled={!valid || secretsMissing || creating}
+					>{creating ? 'Creating…' : 'Create stack'}</Button
+				>
+				<span class="muted"
+					>Commits it to the fleet repository without applying it: review its plan on the next page,
+					then apply.</span
+				>
+			</div>
+			{#if createError}<p class="error" role="alert">{createError}</p>{/if}
+			<h3>Or from the command line</h3>
 			<pre><code>{command}</code></pre>
-			<Button variant="primary" onclick={copy} disabled={!valid}
-				>{copied ? 'Copied' : 'Copy command'}</Button
-			>
+			<Button onclick={copy} disabled={!valid}>{copied ? 'Copied' : 'Copy command'}</Button>
 			{#if !valid}<p class="error" role="status">Fix the marked fields first.</p>{/if}
 			<p class="muted">
 				Run it in the fleet repository, then <code>nepfleet plan</code>, commit and apply.
@@ -300,6 +393,13 @@
 		flex-wrap: wrap;
 		gap: 0.3rem;
 		font-size: 0.8em;
+	}
+	.actions {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+		flex-wrap: wrap;
+		margin: 1rem 0;
 	}
 	.wizard form {
 		display: grid;

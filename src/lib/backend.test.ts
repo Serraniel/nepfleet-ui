@@ -3,6 +3,7 @@ import {
 	AuthError,
 	ConflictError,
 	ScopeError,
+	createStack,
 	InvalidEditError,
 	VerifyFirstError,
 	fetchStackFiles,
@@ -464,5 +465,36 @@ describe('Git sync', () => {
 		await expect(syncNow(backend, 't', off)).rejects.toBeInstanceOf(SyncOffError);
 		const read = (async () => new Response('', { status: 403 })) as unknown as typeof fetch;
 		await expect(syncNow(backend, 't', read)).rejects.toThrow(/apply scope/);
+	});
+});
+
+describe('createStack', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const reply = (status: number, body: unknown) =>
+		(async () =>
+			new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+				status
+			})) as unknown as typeof fetch;
+	it('posts the request, and names each refusal', async () => {
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response(JSON.stringify({ name: 'web', commit: 'c1' }), { status: 201 });
+		}) as unknown as typeof fetch;
+		const res = await createStack(
+			backend,
+			't',
+			{ template: 'hello', name: 'web', values: { A: 'b' } },
+			ok
+		);
+		expect(res.commit).toBe('c1');
+		expect(JSON.parse(sent)).toEqual({ template: 'hello', name: 'web', values: { A: 'b' } });
+		const make = (f: typeof fetch) => createStack(backend, 't', { template: 'hello' }, f);
+		await expect(make(reply(403, { verify: true }))).rejects.toBeInstanceOf(VerifyFirstError);
+		await expect(make(reply(403, 'this token may not create db'))).rejects.toBeInstanceOf(
+			ScopeError
+		);
+		await expect(make(reply(409, 'exists'))).rejects.toBeInstanceOf(ConflictError);
+		await expect(make(reply(422, 'not saved: GREETING is required'))).rejects.toThrow(/GREETING/);
 	});
 });
