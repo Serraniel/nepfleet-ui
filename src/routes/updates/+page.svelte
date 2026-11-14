@@ -4,6 +4,7 @@
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
+	import UpdatesRun from '#lib/UpdatesRun.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
@@ -83,6 +84,21 @@
 		Add an API token for a backend on the <a href="/stacks">Stacks</a> page.
 	</EmptyState>
 {:else}
+	<section aria-labelledby="run-h">
+		<h2 id="run-h">Run updates</h2>
+		<p class="muted">
+			As the backend's timer does: stacks set to <code>updates: auto</code> take rebuilt images, health-checked,
+			and the others' news goes to the notification channels.
+		</p>
+		{#each connected as b (b.id)}
+			{#if tokens.byBackend[b.id]}<UpdatesRun
+					backend={b}
+					token={tokens.byBackend[b.id] ?? ''}
+					label={label(b.id)}
+				/>{/if}
+		{/each}
+	</section>
+	<h2>What's new</h2>
 	<Button onclick={checkAll} disabled={checking}
 		>{checking ? 'Checking…' : rows.length ? 'Check again' : 'Check every stack'}</Button
 	>

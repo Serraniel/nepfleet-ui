@@ -39,7 +39,8 @@ import {
 	fetchUsers,
 	removeAccess,
 	allowEgress,
-	fetchRendered
+	fetchRendered,
+	startUpdates
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -749,5 +750,30 @@ describe('fetchRendered', () => {
 		const odd = (async () =>
 			new Response(JSON.stringify([{ path: 1 }]))) as unknown as typeof fetch;
 		await expect(fetchRendered(backend, 't', 'web', odd)).rejects.toThrow(/Unexpected/);
+	});
+});
+
+describe('startUpdates', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('starts the job, and names refusals', async () => {
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response(
+				JSON.stringify({
+					id: 'j1',
+					stack: '',
+					kind: 'updates',
+					state: 'running',
+					log: '',
+					by: 'ci'
+				}),
+				{ status: 202 }
+			);
+		}) as unknown as typeof fetch;
+		expect((await startUpdates(backend, 't', true, ok)).kind).toBe('updates');
+		expect(JSON.parse(sent)).toEqual({ now: true });
+		const limited = (async () => new Response('', { status: 403 })) as unknown as typeof fetch;
+		await expect(startUpdates(backend, 't', false, limited)).rejects.toThrow(/not limited/);
 	});
 });
