@@ -38,7 +38,8 @@ import {
 	fetchDoctor,
 	fetchUsers,
 	removeAccess,
-	allowEgress
+	allowEgress,
+	fetchRendered
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -734,5 +735,19 @@ describe('allowEgress', () => {
 		await expect(allowEgress(backend, 't', 'web', ['*.a.org'], bad)).rejects.toBeInstanceOf(
 			InvalidEditError
 		);
+	});
+});
+
+describe('fetchRendered', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads the files, and refuses odd answers', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify([{ path: '.env', content: "PW='••••••'\n" }])
+			)) as unknown as typeof fetch;
+		expect((await fetchRendered(backend, 't', 'web', ok))[0]?.path).toBe('.env');
+		const odd = (async () =>
+			new Response(JSON.stringify([{ path: 1 }]))) as unknown as typeof fetch;
+		await expect(fetchRendered(backend, 't', 'web', odd)).rejects.toThrow(/Unexpected/);
 	});
 });

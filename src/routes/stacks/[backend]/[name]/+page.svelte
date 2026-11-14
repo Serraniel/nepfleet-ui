@@ -303,6 +303,10 @@
 <h1>{name}</h1>
 <p>
 	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit">Edit files</a>
+	·
+	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/rendered"
+		>Rendered files</a
+	>
 	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
 {#if places.length}

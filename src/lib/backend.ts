@@ -1300,3 +1300,29 @@ export async function allowEgress(
 		added: o.added as string[]
 	};
 }
+
+/** The files a stack renders to, secrets masked (as nepfleet render). */
+export function fetchRendered(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<{ path: string; content: string }[]> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/render`,
+		(v: unknown): v is { path: string; content: string }[] =>
+			Array.isArray(v) &&
+			v.every(
+				(f) =>
+					typeof f === 'object' &&
+					f !== null &&
+					typeof (f as Record<string, unknown>).path === 'string' &&
+					typeof (f as Record<string, unknown>).content === 'string'
+			),
+		fetcher,
+		timeoutMs
+	);
+}
