@@ -51,7 +51,8 @@ test('toasts: errors are announced as alerts and stay', async ({ page }) => {
 	await page.getByRole('button', { name: /^Dismiss: Apply failed: health/ }).click();
 	await expect(page.getByText('health check timed out')).toBeHidden();
 	await page.getByRole('button', { name: 'Success toast' }).click();
-	await expect(page.getByRole('status')).toContainText('applied');
+	// The toaster's status region; the page's spinner sample is one too.
+	await expect(page.locator('.toaster [role=status]')).toContainText('applied');
 });
 
 test('toasts raised while a dialog is open show inside it', async ({ page }) => {
