@@ -3,6 +3,9 @@ import { AuthError, ConflictError } from './backend.ts';
 import {
 	type RemoteReport,
 	addRemote,
+	LockedKeyError,
+	WrongPassphraseError,
+	unlockKey,
 	canConnect,
 	describe,
 	fetchEvents,
@@ -187,5 +190,37 @@ group('startSetup with a sudo password', () => {
 			plan: 'p1',
 			sudoPassword: 'pw'
 		});
+	});
+});
+
+group('locked keys', () => {
+	it('turns lockedKeys in an error into LockedKeyError, and unlocks', async () => {
+		const reply = (status: number, body: unknown) =>
+			(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+		const err = await addRemote(
+			'http://127.0.0.1:7481',
+			't',
+			'ssh://me@vps',
+			'vps',
+			reply(502, { error: 'refused', lockedKeys: ['/home/me/.ssh/id_rsa'] })
+		).catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(LockedKeyError);
+		expect((err as LockedKeyError).keys).toEqual(['/home/me/.ssh/id_rsa']);
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response(null, { status: 204 });
+		}) as unknown as typeof fetch;
+		await unlockKey('http://127.0.0.1:7481', 't', '/home/me/.ssh/id_rsa', 'pw', ok);
+		expect(JSON.parse(sent)).toEqual({ path: '/home/me/.ssh/id_rsa', passphrase: 'pw' });
+		await expect(
+			unlockKey(
+				'http://127.0.0.1:7481',
+				't',
+				'/home/me/.ssh/id_rsa',
+				'no',
+				reply(403, { error: "that passphrase doesn't unlock the key" })
+			)
+		).rejects.toBeInstanceOf(WrongPassphraseError);
 	});
 });
