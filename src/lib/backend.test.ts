@@ -20,7 +20,10 @@ import {
 	fetchStacks,
 	normalizeUrl,
 	stackPlaces,
-	stackRelations
+	stackRelations,
+	SyncOffError,
+	fetchSync,
+	syncNow
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -425,5 +428,41 @@ describe('editing stack files', () => {
 		await expect(save(reply(403, 'forbidden'))).rejects.toBeInstanceOf(ScopeError);
 		await expect(save(reply(409, 'a file changed'))).rejects.toBeInstanceOf(ConflictError);
 		await expect(save(reply(422, 'not saved: bad'))).rejects.toBeInstanceOf(InvalidEditError);
+	});
+});
+
+describe('Git sync', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads the status, and treats an older server as off', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify({
+					enabled: true,
+					interval: '5m0s',
+					commit: 'abc1234',
+					applied: ['web'],
+					pending: ['db']
+				})
+			)) as unknown as typeof fetch;
+		const s = await fetchSync(backend, 't', ok);
+		expect(s.pending).toEqual(['db']);
+		const old = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+		expect((await fetchSync(backend, 't', old)).enabled).toBe(false);
+		const odd = (async () =>
+			new Response(JSON.stringify({ enabled: 'yes' }))) as unknown as typeof fetch;
+		await expect(fetchSync(backend, 't', odd)).rejects.toThrow(/Unexpected/);
+	});
+	it('asks for a sync, and says when the server does not sync', async () => {
+		let method = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			method = init.method ?? '';
+			return new Response(null, { status: 202 });
+		}) as unknown as typeof fetch;
+		await syncNow(backend, 't', ok);
+		expect(method).toBe('POST');
+		const off = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
+		await expect(syncNow(backend, 't', off)).rejects.toBeInstanceOf(SyncOffError);
+		const read = (async () => new Response('', { status: 403 })) as unknown as typeof fetch;
+		await expect(syncNow(backend, 't', read)).rejects.toThrow(/apply scope/);
 	});
 });
