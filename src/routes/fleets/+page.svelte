@@ -17,8 +17,12 @@
 		WrongPassphraseError,
 		unlockKey,
 		canConnect,
-		startSetup
+		startSetup,
+		type SetupKind,
+		fetchSettings,
+		saveSettings
 	} from '#lib/local.ts';
+	import TextField from '#lib/ui/TextField.svelte';
 	import { ConflictError } from '#lib/backend.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
@@ -201,8 +205,8 @@
 	});
 	let planning = $state(false);
 
-	async function planSetup(r: Remote) {
-		const kind = setupKind(r.report);
+	async function planSetup(r: Remote, explicit?: SetupKind) {
+		const kind = explicit ?? setupKind(r.report);
 		setupPlan = null;
 		setupError = '';
 		if (!kind) return;
@@ -220,11 +224,11 @@
 		}
 	}
 
-	function openSetup(r: Remote) {
+	function openSetup(r: Remote, kind?: SetupKind) {
 		setupFor = r;
 		setupJob = null;
 		setupOpen = true;
-		void planSetup(r);
+		void planSetup(r, kind);
 	}
 
 	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -254,14 +258,44 @@
 					: e instanceof Error
 						? e.message
 						: String(e);
-			if (e instanceof ConflictError) void planSetup(r);
+			if (e instanceof ConflictError) void planSetup(r, p.kind);
 		}
 	}
 
 	const setupRunning = $derived(setupJob?.state === 'running');
 	const needsPassword = $derived(!!setupPlan?.sudoPassword && !setupRunning);
 	const setupTitle = (p: SetupPlan | null) =>
-		p?.kind === 'install' ? 'Install NepFleet' : 'Prepare the machine';
+		p?.kind === 'install'
+			? 'Install NepFleet'
+			: p?.kind === 'mounts'
+				? 'Network mounts'
+				: 'Prepare the machine';
+
+	// The local fleet repository folder: mounts are planned from its hosts/.
+	let fleetDir = $state('');
+	let fleetDirSaved = $state('');
+	let fleetDirError = $state('');
+	async function loadSettings() {
+		try {
+			fleetDirSaved = (await fetchSettings(local.url, local.token)).fleetDir ?? '';
+			fleetDir = fleetDirSaved;
+		} catch {
+			// an older daemon: no settings
+		}
+	}
+	async function saveFleetDir(e: SubmitEvent) {
+		e.preventDefault();
+		fleetDirError = '';
+		try {
+			fleetDirSaved =
+				(await saveSettings(local.url, local.token, { fleetDir: fleetDir.trim() })).fleetDir ?? '';
+		} catch (err) {
+			fleetDirError = err instanceof Error ? err.message : String(err);
+		}
+	}
+	$effect(() => {
+		if (local.connected) void loadSettings();
+	});
 
 	const tunnelText: Record<string, string> = {
 		off: 'Not connected',
@@ -324,6 +358,25 @@ nepfleet control token</code
 		{/if}
 	</div>
 	{#if local.error}<p class="error" role="alert">{local.error}</p>{/if}
+
+	<section class="card" aria-labelledby="fleetdir-h">
+		<h2 id="fleetdir-h">Fleet repository on this computer</h2>
+		<p class="muted">
+			For a machine's network mounts: they're planned from <code>hosts/&lt;machine&gt;.yaml</code>
+			in your local copy of the fleet repository, and share passwords are decrypted with this computer's
+			age key. They go only to the machine, never to the NepFleet server.
+		</p>
+		<form class="row" onsubmit={saveFleetDir}>
+			<TextField
+				label="Folder"
+				bind:value={fleetDir}
+				placeholder="/home/you/fleet"
+				error={fleetDirError}
+				hint={fleetDirSaved ? `Using ${fleetDirSaved}` : 'Not set'}
+			/>
+			<Button type="submit" disabled={fleetDir.trim() === fleetDirSaved}>Save</Button>
+		</form>
+	</section>
 
 	<section class="card" aria-labelledby="add-h">
 		<h2 id="add-h">Add a machine</h2>
@@ -393,6 +446,11 @@ nepfleet control token</code
 							>
 						{:else if canConnect(r.report)}
 							<Button onclick={() => act(r, 'connect')} disabled={busy[r.name]}>Connect</Button>
+						{/if}
+						{#if r.report && !setupKind(r.report)}
+							<Button onclick={() => openSetup(r, 'mounts')} disabled={busy[r.name]}
+								>Network mounts…</Button
+							>
 						{/if}
 						<Button variant="ghost" onclick={() => act(r, 'refresh')} disabled={busy[r.name]}>
 							Check again

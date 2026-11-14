@@ -188,7 +188,8 @@ export async function removeRemote(
 }
 
 /** Preparing a machine (Docker, Compose, network) or installing NepFleet on it. */
-export type SetupKind = 'bootstrap' | 'install';
+/** Preparing a machine, installing NepFleet, or its network mounts (host apply). */
+export type SetupKind = 'bootstrap' | 'install' | 'mounts';
 
 /** One step of a setup; root steps run as root over SSH. */
 export interface SetupStep {
@@ -227,7 +228,7 @@ function isSetupPlan(v: unknown): v is SetupPlan {
 	return (
 		typeof o === 'object' &&
 		o !== null &&
-		(o.kind === 'bootstrap' || o.kind === 'install') &&
+		(o.kind === 'bootstrap' || o.kind === 'install' || o.kind === 'mounts') &&
 		Array.isArray(o.steps) &&
 		o.steps.every((s) => typeof s?.text === 'string' && typeof s.root === 'boolean')
 	);
@@ -374,4 +375,31 @@ export async function markSeen(
  */
 export function canConnect(r: RemoteReport | undefined): boolean {
 	return !!r && (r.nepfleetRunning === true || !!r.fleet);
+}
+
+/** What the daemon keeps for the app: the local fleet repository folder. */
+export interface DaemonSettings {
+	fleetDir?: string;
+}
+
+export async function fetchSettings(
+	daemon: string,
+	token: string,
+	fetcher: typeof fetch = fetch
+): Promise<DaemonSettings> {
+	const o = (await call(daemon, token, 'GET', '/v1/settings', undefined, fetcher, 10000)) as
+		DaemonSettings | undefined;
+	return { fleetDir: typeof o?.fleetDir === 'string' ? o.fleetDir : undefined };
+}
+
+/** Saves the settings; the daemon checks the folder has a fleet.yaml. */
+export async function saveSettings(
+	daemon: string,
+	token: string,
+	settings: DaemonSettings,
+	fetcher: typeof fetch = fetch
+): Promise<DaemonSettings> {
+	const o = (await call(daemon, token, 'PUT', '/v1/settings', settings, fetcher, 10000)) as
+		DaemonSettings | undefined;
+	return { fleetDir: typeof o?.fleetDir === 'string' ? o.fleetDir : undefined };
 }
