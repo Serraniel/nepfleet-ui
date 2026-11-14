@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/Serraniel/nepfleet-ui/compare/v0.3.2...v0.3.3) (2026-11-14)
+
+
+### Chores
+
+* release 0.3.3 ([#135](https://github.com/Serraniel/nepfleet-ui/issues/135)) ([0160163](https://github.com/Serraniel/nepfleet-ui/commit/0160163a661b13ba8badb0d96aca98753839484e))
+
 ## [0.3.2](https://github.com/Serraniel/nepfleet-ui/compare/v0.3.1...v0.3.2) (2026-11-14)
 
 
