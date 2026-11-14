@@ -717,3 +717,73 @@ export function fetchJob(
 		timeoutMs
 	);
 }
+
+/** Where the server's fleet repository stands against its origin (GET /api/v1/sync). */
+export interface SyncStatus {
+	/** The server pulls by itself (serve --sync), or on webhooks. */
+	enabled: boolean;
+	interval?: string;
+	last?: string;
+	commit?: string;
+	error?: string;
+	applied?: string[];
+	failed?: string[];
+	pending?: string[];
+}
+
+const isNames = (v: unknown) =>
+	v === undefined || v === null || (Array.isArray(v) && v.every((s) => typeof s === 'string'));
+
+function isSyncStatus(v: unknown): v is SyncStatus {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return (
+		typeof o.enabled === 'boolean' &&
+		(o.error === undefined || typeof o.error === 'string') &&
+		isNames(o.applied) &&
+		isNames(o.failed) &&
+		isNames(o.pending)
+	);
+}
+
+/** How the server's last Git sync went. A server older than sync answers 404. */
+export async function fetchSync(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 15000
+): Promise<SyncStatus> {
+	try {
+		return await apiGet(backend, token, '/api/v1/sync', isSyncStatus, fetcher, timeoutMs);
+	} catch (e) {
+		if (e instanceof NotFoundError) return { enabled: false };
+		throw e;
+	}
+}
+
+/** The server doesn't sync: it was started without --sync. */
+export class SyncOffError extends Error {}
+
+/** Asks the server to pull now; it syncs in the background. */
+export async function syncNow(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 15000
+): Promise<void> {
+	const res = await fetcher(`${backend.url}/api/v1/sync`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/json', ...authInit(token).headers }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError('This token may only read. Syncing needs one with the apply scope.');
+	if (res.status === 503 || res.status === 404)
+		throw new SyncOffError(
+			'This server does not sync: start it with nepfleet serve --sync <interval>.'
+		);
+	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
+}
