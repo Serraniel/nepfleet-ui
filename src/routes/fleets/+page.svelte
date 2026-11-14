@@ -295,9 +295,11 @@
 			? 'Install NepFleet'
 			: (p?.kind ?? setupAsked) === 'update'
 				? 'Update NepFleet'
-				: (p?.kind ?? setupAsked) === 'mounts'
-					? 'Network mounts'
-					: 'Prepare the machine';
+				: (p?.kind ?? setupAsked) === 'start'
+					? 'Start NepFleet'
+					: (p?.kind ?? setupAsked) === 'mounts'
+						? 'Network mounts'
+						: 'Prepare the machine';
 
 	// The local fleet repository folder: mounts are planned from its hosts/.
 	let fleetDir = $state('');
@@ -536,6 +538,13 @@ nepfleet control token</code
 											<strong>{c.status === 'fail' ? '✗' : '⚠'} {c.name}</strong>
 											{#if c.detail}<span>{c.detail}</span>{/if}
 											{#if c.fix}<span class="fix">Fix: <code>{c.fix}</code></span>{/if}
+											{#if c.action === 'start'}
+												<span
+													><Button onclick={() => openSetup(r, 'start')} disabled={!!busy[r.name]}
+														>Start NepFleet…</Button
+													></span
+												>
+											{/if}
 										</li>
 									{/each}
 								</ul>

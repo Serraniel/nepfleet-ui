@@ -270,7 +270,13 @@ group('runDoctor', () => {
 		);
 	});
 	it('refuses odd answers', async () => {
-		for (const body of [{}, [{ name: 'x', status: 'great' }], [{ status: 'ok' }], 'checks']) {
+		for (const body of [
+			{},
+			[{ name: 'x', status: 'great' }],
+			[{ status: 'ok' }],
+			[{ name: 'x', status: 'fail', action: 'rm -rf' }],
+			'checks'
+		]) {
 			await expect(
 				runDoctor('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(body))
 			).rejects.toThrow('Unexpected response');
