@@ -185,6 +185,27 @@ export async function fetchStacks(
 /** Thrown when the backend has no such stack, or the token does not cover it. */
 export class NotFoundError extends Error {}
 
+/** The scope a GET of the API needs, by its path (as the server's routes). */
+export function neededScope(path: string): 'read' | 'edit' | 'admin' {
+	const p = path.split('?')[0] ?? path;
+	if (/^\/api\/v1\/(tokens|users|doctor|mirror|secrets)(\/|$)/.test(p)) return 'admin';
+	if (
+		/^\/api\/v1\/stacks\/[^/]+\/(files|secrets|backups)$/.test(p) ||
+		/^\/api\/v1\/import\//.test(p)
+	)
+		return 'edit';
+	return 'read';
+}
+
+/** What to tell when the token may not: which scope, and the way out. */
+export function scopeMessage(scope: 'read' | 'edit' | 'admin'): string {
+	return (
+		`This needs a token with the ${scope} scope, and this backend's token has less. ` +
+		'Use one that has it (or sign in to the backend). For a machine connected through ' +
+		'the desktop app: update NepFleet on this computer, then disconnect and connect it again.'
+	);
+}
+
 /** GET with an API token; validate checks the body's shape. */
 async function apiGet<T>(
 	backend: Backend,
@@ -201,7 +222,7 @@ async function apiGet<T>(
 	});
 	if (res.status === 401) throw new AuthError('The backend refused the token');
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
-	if (res.status === 403) throw new ScopeError("This token's scope doesn't cover this");
+	if (res.status === 403) throw new ScopeError(scopeMessage(neededScope(path)));
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
 	const body: unknown = await res.json();

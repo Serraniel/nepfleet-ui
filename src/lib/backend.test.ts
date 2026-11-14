@@ -49,7 +49,9 @@ import {
 	fetchBackups,
 	startRestore,
 	fetchComposeProjects,
-	importCompose
+	importCompose,
+	neededScope,
+	scopeMessage
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -937,6 +939,24 @@ describe('compose import', () => {
 			})) as unknown as typeof fetch;
 		await expect(importCompose(backend, 't', 'blog', false, taken)).rejects.toBeInstanceOf(
 			ConflictError
+		);
+	});
+});
+
+describe('scope errors', () => {
+	it('name the scope a path needs', () => {
+		expect(neededScope('/api/v1/tokens')).toBe('admin');
+		expect(neededScope('/api/v1/users')).toBe('admin');
+		expect(neededScope('/api/v1/stacks/web/files')).toBe('edit');
+		expect(neededScope('/api/v1/stacks/web/secrets')).toBe('edit');
+		expect(neededScope('/api/v1/import/compose')).toBe('edit');
+		expect(neededScope('/api/v1/stacks/web/plan?x=1')).toBe('read');
+		expect(scopeMessage('admin')).toContain('admin scope');
+	});
+	it('say it when the backend refuses', async () => {
+		const no = (async () => new Response('', { status: 403 })) as unknown as typeof fetch;
+		await expect(fetchTokens({ id: 'b', url: 'https://x.example' }, 't', no)).rejects.toThrow(
+			/admin scope/
 		);
 	});
 });
