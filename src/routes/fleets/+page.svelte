@@ -20,7 +20,9 @@
 		startSetup,
 		type SetupKind,
 		fetchSettings,
-		saveSettings
+		saveSettings,
+		runDoctor,
+		type DoctorCheck
 	} from '#lib/local.ts';
 	import TextField from '#lib/ui/TextField.svelte';
 	import { ConflictError } from '#lib/backend.ts';
@@ -160,6 +162,23 @@
 			addError = e instanceof Error ? e.message : String(e);
 		} finally {
 			adding = false;
+		}
+	}
+
+	/** Per machine: nepfleet doctor's last answer. */
+	let doctor = $state<Record<string, { checks?: DoctorCheck[]; error?: string }>>({});
+
+	async function checkNepFleet(r: Remote) {
+		busy[r.name] = 'doctor';
+		try {
+			const checks = await runDoctor(local.url, local.token, r.name);
+			// Problems first, the worst on top.
+			const rank = { fail: 0, warn: 1, ok: 2 };
+			doctor[r.name] = { checks: checks.toSorted((a, b) => rank[a.status] - rank[b.status]) };
+		} catch (e) {
+			doctor[r.name] = { error: e instanceof Error ? e.message : String(e) };
+		} finally {
+			delete busy[r.name];
 		}
 	}
 
@@ -465,6 +484,14 @@ nepfleet control token</code
 							disabled={!!busy[r.name]}
 							busy={busy[r.name] === 'refresh'}>Check again</Button
 						>
+						{#if r.report?.nepfleet || r.report?.nepfleetRunning}
+							<Button
+								onclick={() => checkNepFleet(r)}
+								disabled={!!busy[r.name]}
+								busy={busy[r.name] === 'doctor'}
+								title="Runs nepfleet doctor on the machine over SSH">Check NepFleet</Button
+							>
+						{/if}
 						<Button
 							variant="ghost"
 							onclick={() => {
@@ -475,6 +502,30 @@ nepfleet control token</code
 							busy={busy[r.name] === 'remove'}>Remove…</Button
 						>
 					</div>
+					{#if doctor[r.name]}
+						{@const d = doctor[r.name]!}
+						<div class="doctor" aria-label="NepFleet checks on {r.name}">
+							{#if d.error}
+								<p class="error" role="alert">Doctor: {d.error}</p>
+							{:else if d.checks}
+								{@const problems = d.checks.filter((c) => c.status !== 'ok')}
+								<p role="status">
+									{problems.length === 0
+										? `All ${d.checks.length} checks pass.`
+										: `${problems.length} of ${d.checks.length} checks need attention.`}
+								</p>
+								<ul>
+									{#each problems as c (c.name)}
+										<li class={c.status}>
+											<strong>{c.status === 'fail' ? '✗' : '⚠'} {c.name}</strong>
+											{#if c.detail}<span>{c.detail}</span>{/if}
+											{#if c.fix}<span class="fix">Fix: <code>{c.fix}</code></span>{/if}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -603,6 +654,25 @@ nepfleet control token</code
 </Dialog>
 
 <style>
+	.doctor ul {
+		list-style: none;
+		padding: 0;
+		margin: 0.5rem 0 0;
+		display: grid;
+		gap: 0.5rem;
+	}
+	.doctor li {
+		display: grid;
+		gap: 0.15rem;
+		padding-left: 0.6rem;
+		border-left: 3px solid var(--warn);
+	}
+	.doctor li.fail {
+		border-left-color: var(--err);
+	}
+	.doctor .fix code {
+		overflow-wrap: anywhere;
+	}
 	header p,
 	.muted {
 		color: var(--muted);

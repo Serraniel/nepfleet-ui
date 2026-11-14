@@ -18,7 +18,8 @@ import {
 	removeRemote,
 	setupKind,
 	startSetup,
-	saveSettings
+	saveSettings,
+	runDoctor
 } from './local.ts';
 
 const daemon = 'http://127.0.0.1:7481';
@@ -252,5 +253,26 @@ group('daemon settings and mounts', () => {
 		const plan = await fetchSetupPlan('http://127.0.0.1:1', 't', 'vps', 'mounts', fake);
 		expect(plan.kind).toBe('mounts');
 		expect(calls[1]?.url).toContain('kind=mounts');
+	});
+});
+
+group('runDoctor', () => {
+	const answering = (body: unknown) =>
+		(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch;
+	it('returns the checks', async () => {
+		const checks = [
+			{ name: 'Docker', status: 'ok', detail: '29.9' },
+			{ name: 'Key copy', status: 'warn', detail: 'none', fix: 'nepfleet key backup' }
+		];
+		expect(await runDoctor('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(checks))).toEqual(
+			checks
+		);
+	});
+	it('refuses odd answers', async () => {
+		for (const body of [{}, [{ name: 'x', status: 'great' }], [{ status: 'ok' }], 'checks']) {
+			await expect(
+				runDoctor('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(body))
+			).rejects.toThrow('Unexpected response');
+		}
 	});
 });
