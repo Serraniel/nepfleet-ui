@@ -1,0 +1,47 @@
+name: Native app
+
+# The prototype desktop app with native Qt controls (native/, issue #81)
+# builds and passes vet. Qt's bindings compile slowly once; Go's build cache
+# keeps later runs short.
+on:
+  pull_request:
+    paths: ['native/**', '.github/workflows/native.yml']
+  push:
+    branches: [main]
+    paths: ['native/**', '.github/workflows/native.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: native/go.mod
+          cache-dependency-path: native/go.sum
+      - name: Qt 6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev
+      - name: Vet and build
+        working-directory: native
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::run gofmt"; exit 1; }
+          go vet ./...
+          go build -trimpath -ldflags '-s -w' -o nepfleet-native .
+          ls -l nepfleet-native
+      # It starts without a display, reaches no daemon, and doesn't crash.
+      - name: Starts
+        working-directory: native
+        env:
+          QT_QPA_PLATFORM: offscreen
+          NEPFLEET_CONTROL_DIR: ${{ runner.temp }}/control
+          NEPFLEET_NATIVE_SCREENSHOT: ${{ runner.temp }}/native.png
+          XDG_RUNTIME_DIR: ${{ runner.temp }}
+        run: |
+          timeout 60 env PATH=/nonexistent ./nepfleet-native
+          test -s "$NEPFLEET_NATIVE_SCREENSHOT"
