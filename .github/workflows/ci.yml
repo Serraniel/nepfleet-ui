@@ -45,7 +45,15 @@ jobs:
         with:
           go-version: '1.27.4'
           cache: false
-      - run: go install github.com/Serraniel/nepfleet/cmd/nepfleet@main
+      # nepfleet from its main branch, built from source: the e2e tests follow the
+      # API as it is developed (a pinned checkout, not an unpinned go install).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Serraniel/nepfleet
+          ref: main
+          path: .nepfleet-src
+          persist-credentials: false
+      - run: go build -C .nepfleet-src -o "$(go env GOPATH)/bin/nepfleet" ./cmd/nepfleet
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e # nepfleet is on PATH via setup-go
