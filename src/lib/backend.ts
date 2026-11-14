@@ -1601,3 +1601,77 @@ export async function startRestore(
 	if (!isJob(job)) throw new Error('Unexpected response');
 	return job;
 }
+
+/** A Compose project of a backend's host, and whether it's a stack already. */
+export interface ComposeProject {
+	name: string;
+	status: string;
+	configFiles: string[];
+	stack: boolean;
+}
+
+export async function fetchComposeProjects(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 70000
+): Promise<ComposeProject[] | null> {
+	try {
+		return await apiGet(
+			backend,
+			token,
+			'/api/v1/import/compose',
+			(v: unknown): v is ComposeProject[] =>
+				Array.isArray(v) &&
+				v.every(
+					(p) =>
+						typeof p === 'object' &&
+						p !== null &&
+						typeof (p as Record<string, unknown>).name === 'string'
+				),
+			fetcher,
+			timeoutMs
+		);
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}
+
+/** Imports a Compose project as a stack, adopted and committed. */
+export async function importCompose(
+	backend: Backend,
+	token: string,
+	project: string,
+	encryptAll = false,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 330000
+): Promise<{ stack: string; commit: string; log: string }> {
+	const res = await fetcher(`${backend.url}/api/v1/import/compose`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify(encryptAll ? { project, encryptAll } : { project })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError(
+			'Importing needs a token with the edit scope that is not limited to stacks, or signing in.'
+		);
+	}
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
+	if (res.status !== 201) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { stack?: unknown; commit?: unknown; log?: unknown };
+	if (typeof o.stack !== 'string' || typeof o.commit !== 'string')
+		throw new Error('Unexpected response');
+	return { stack: o.stack, commit: o.commit, log: typeof o.log === 'string' ? o.log : '' };
+}

@@ -172,7 +172,8 @@
 			<option value="stopped">Stopped</option>
 			<option value="unknown">Unknown (other host, swarm, not applied)</option>
 		</select>
-		<a href="/updates">Which have updates?</a>
+		<a href="/updates">Which have updates?</a> ·
+		<a href="/import">Import running Compose projects…</a>
 	</div>
 
 	{#if shown.length === 0}

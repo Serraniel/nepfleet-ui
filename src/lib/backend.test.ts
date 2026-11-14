@@ -47,7 +47,9 @@ import {
 	fetchEvents,
 	fetchMatches,
 	fetchBackups,
-	startRestore
+	startRestore,
+	fetchComposeProjects,
+	importCompose
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -909,5 +911,32 @@ describe('restore', () => {
 				status: 422
 			})) as unknown as typeof fetch;
 		await expect(fetchBackups(backend, 't', 'web', none)).rejects.toThrow();
+	});
+});
+
+describe('compose import', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('lists projects and imports one', async () => {
+		const list = (async () =>
+			new Response(
+				JSON.stringify([{ name: 'blog', status: 'running(2)', configFiles: [], stack: false }])
+			)) as unknown as typeof fetch;
+		expect((await fetchComposeProjects(backend, 't', list))?.[0]?.name).toBe('blog');
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response(JSON.stringify({ stack: 'blog', commit: 'c1', log: 'adopted' }), {
+				status: 201
+			});
+		}) as unknown as typeof fetch;
+		expect((await importCompose(backend, 't', 'blog', false, ok)).stack).toBe('blog');
+		expect(JSON.parse(sent)).toEqual({ project: 'blog' });
+		const taken = (async () =>
+			new Response('a stack of that name exists already', {
+				status: 409
+			})) as unknown as typeof fetch;
+		await expect(importCompose(backend, 't', 'blog', false, taken)).rejects.toBeInstanceOf(
+			ConflictError
+		);
 	});
 });
