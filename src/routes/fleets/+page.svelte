@@ -227,8 +227,12 @@
 	});
 	let planning = $state(false);
 
+	/** The kind asked for: titles the dialog also when planning failed. */
+	let setupAsked = $state<SetupKind | null>(null);
+
 	async function planSetup(r: Remote, explicit?: SetupKind) {
 		const kind = explicit ?? setupKind(r.report);
+		setupAsked = kind ?? null;
 		setupPlan = null;
 		setupError = '';
 		if (!kind) return;
@@ -287,11 +291,11 @@
 	const setupRunning = $derived(setupJob?.state === 'running');
 	const needsPassword = $derived(!!setupPlan?.sudoPassword && !setupRunning);
 	const setupTitle = (p: SetupPlan | null) =>
-		p?.kind === 'install'
+		(p?.kind ?? setupAsked) === 'install'
 			? 'Install NepFleet'
-			: p?.kind === 'update'
+			: (p?.kind ?? setupAsked) === 'update'
 				? 'Update NepFleet'
-				: p?.kind === 'mounts'
+				: (p?.kind ?? setupAsked) === 'mounts'
 					? 'Network mounts'
 					: 'Prepare the machine';
 
