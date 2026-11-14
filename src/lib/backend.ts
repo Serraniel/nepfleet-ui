@@ -1401,3 +1401,55 @@ export async function backupKey(
 	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
 	return res.blob();
 }
+
+/** One of a backend's spec.mirrors: its last successful push and last error. */
+export interface MirrorStatus {
+	url: string;
+	ok?: string;
+	error?: string;
+}
+
+const isMirrors = (v: unknown): v is MirrorStatus[] =>
+	Array.isArray(v) &&
+	v.every(
+		(m) =>
+			typeof m === 'object' && m !== null && typeof (m as Record<string, unknown>).url === 'string'
+	);
+
+/** The backend's mirrors (admin scope); null on an older backend. */
+export async function fetchMirrors(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<MirrorStatus[] | null> {
+	try {
+		return await apiGet(backend, token, '/api/v1/mirror', isMirrors, fetcher, timeoutMs);
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}
+
+/** Pushes the fleet repository to its mirrors now, and says how each went. */
+export async function mirrorNow(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 200000
+): Promise<MirrorStatus[]> {
+	const res = await fetcher(`${backend.url}/api/v1/mirror`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/json', ...authInit(token).headers }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) throw new ScopeError('Mirroring needs an admin token, or signing in.');
+	if (res.status === 503) throw new Error('The backend is busy with another operation; try again');
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	const v: unknown = await res.json();
+	if (!isMirrors(v)) throw new Error('Unexpected response');
+	return v;
+}
