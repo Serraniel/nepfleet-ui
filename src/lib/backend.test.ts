@@ -29,6 +29,7 @@ import {
 	setSecret,
 	secretKeyPattern,
 	fetchFeatures,
+	fetchSBOM,
 	fetchChannels,
 	testChannel
 } from './backend.ts';
@@ -579,5 +580,24 @@ describe('notification channels', () => {
 		const bad = (async () =>
 			new Response('sending failed: 401 Unauthorized', { status: 502 })) as unknown as typeof fetch;
 		await expect(testChannel(backend, 't', 'discord', bad)).rejects.toThrow(/401/);
+	});
+});
+
+describe('fetchSBOM', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('asks for a stack or the fleet, with contents when wanted', async () => {
+		const urls: string[] = [];
+		const ok = (async (u: string) => {
+			urls.push(u);
+			return new Response('{"bomFormat":"CycloneDX"}');
+		}) as unknown as typeof fetch;
+		expect(await (await fetchSBOM(backend, 't', 'web', false, ok)).text()).toContain('CycloneDX');
+		await fetchSBOM(backend, 't', '', true, ok);
+		expect(urls).toEqual([
+			'https://fleet.example.org/api/v1/stacks/web/sbom',
+			'https://fleet.example.org/api/v1/sbom?contents=true'
+		]);
+		const busy = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
+		await expect(fetchSBOM(backend, 't', 'web', false, busy)).rejects.toThrow(/busy/);
 	});
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SBOMButton from '#lib/SBOMButton.svelte';
 	import { onMount } from 'svelte';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
@@ -138,6 +139,8 @@
 					<Button onclick={() => stacks.load(backend)}>Retry</Button>
 				{:else}
 					<p class="muted">{st.stacks.length} stacks</p>
+					{@const tok = tokens.byBackend[backend.id]}
+					{#if tok}<SBOMButton {backend} token={tok} stack="" />{/if}
 					{#if !backend.local && tokens.byBackend[backend.id] !== SESSION}
 						<Button variant="ghost" onclick={() => forget(backend.id)}>Forget token</Button>
 					{/if}
