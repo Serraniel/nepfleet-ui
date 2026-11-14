@@ -1493,3 +1493,44 @@ export async function fetchEvents(
 	}
 	return all;
 }
+
+/** Which templates run a plain stack's images (nepfleet template match). */
+export interface TemplateMatches {
+	template?: string;
+	matches: {
+		source: string;
+		name: string;
+		title?: string;
+		version: string;
+		same: { image: string; stack: string; template: string }[];
+		onlyStack: string[];
+		onlyTemplate: string[];
+	}[];
+}
+
+export function fetchMatches(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<TemplateMatches> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/match`,
+		(v: unknown): v is TemplateMatches =>
+			typeof v === 'object' &&
+			v !== null &&
+			Array.isArray((v as Record<string, unknown>).matches) &&
+			((v as Record<string, unknown>).matches as unknown[]).every(
+				(m) =>
+					typeof m === 'object' &&
+					m !== null &&
+					typeof (m as Record<string, unknown>).name === 'string' &&
+					Array.isArray((m as Record<string, unknown>).same)
+			),
+		fetcher,
+		timeoutMs
+	);
+}
