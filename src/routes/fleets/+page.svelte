@@ -453,9 +453,7 @@ nepfleet control token</code
 								>Network mounts…</Button
 							>
 						{/if}
-						<Button variant="ghost" onclick={() => act(r, 'refresh')} disabled={busy[r.name]}>
-							Check again
-						</Button>
+						<Button onclick={() => act(r, 'refresh')} disabled={busy[r.name]}>Check again</Button>
 						<Button
 							variant="ghost"
 							onclick={() => {

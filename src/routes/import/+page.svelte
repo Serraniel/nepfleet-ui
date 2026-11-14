@@ -123,7 +123,7 @@
 							{#if p.stack}
 								<span class="muted">a stack already</span>
 							{:else}
-								<Button variant="ghost" disabled={busy !== ''} onclick={() => run(b.id, p.name)}
+								<Button disabled={busy !== ''} onclick={() => run(b.id, p.name)}
 									>{busy === b.id + '/' + p.name ? 'Importing…' : 'Import'}</Button
 								>
 							{/if}
