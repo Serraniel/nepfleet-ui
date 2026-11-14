@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { type Snippet, untrack } from 'svelte';
 	import Toaster from './Toaster.svelte';
 	import { toasts } from './toasts.svelte.ts';
 
@@ -21,10 +21,12 @@
 		if (!open && dialog.open) dialog.close();
 	});
 	// The page's toasts are inert behind a modal: show them in here instead.
+	// untrack: ++ reads the count too, and an effect that reads what it
+	// writes runs again and again (effect_update_depth_exceeded).
 	$effect(() => {
 		if (!open) return;
-		toasts.modals++;
-		return () => toasts.modals--;
+		untrack(() => toasts.modals++);
+		return () => untrack(() => toasts.modals--);
 	});
 </script>
 
