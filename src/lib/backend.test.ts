@@ -40,7 +40,8 @@ import {
 	removeAccess,
 	allowEgress,
 	fetchRendered,
-	startUpdates
+	startUpdates,
+	backupKey
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -775,5 +776,25 @@ describe('startUpdates', () => {
 		expect(JSON.parse(sent)).toEqual({ now: true });
 		const limited = (async () => new Response('', { status: 403 })) as unknown as typeof fetch;
 		await expect(startUpdates(backend, 't', false, limited)).rejects.toThrow(/not limited/);
+	});
+});
+
+describe('backupKey', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('posts the recipients and names refusals', async () => {
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response('-----BEGIN AGE ENCRYPTED FILE-----\n');
+		}) as unknown as typeof fetch;
+		expect(await (await backupKey(backend, 't', ['age1x'], ok)).text()).toContain('AGE ENCRYPTED');
+		expect(JSON.parse(sent)).toEqual({ recipients: ['age1x'] });
+		const token = (async () => new Response('', { status: 403 })) as unknown as typeof fetch;
+		await expect(backupKey(backend, 't', ['age1x'], token)).rejects.toThrow(/person/);
+		const verify = (async () =>
+			new Response(JSON.stringify({ verify: true }), { status: 403 })) as unknown as typeof fetch;
+		await expect(backupKey(backend, 't', ['age1x'], verify)).rejects.toBeInstanceOf(
+			VerifyFirstError
+		);
 	});
 });

@@ -1363,3 +1363,41 @@ export async function startUpdates(
 	if (!isJob(job)) throw new Error('Unexpected response');
 	return job;
 }
+
+/**
+ * The backend's age key, encrypted with age to the given public keys (age1… or
+ * an SSH public key). Only a signed-in person may; throws VerifyFirstError when
+ * they must confirm with a passkey first.
+ */
+export async function backupKey(
+	backend: Backend,
+	token: string,
+	recipients: string[],
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<Blob> {
+	const res = await fetcher(`${backend.url}/api/v1/key/backup`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/octet-stream',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify({ recipients })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError(
+			'Only a person signed in to the backend can back up its key, not a token.'
+		);
+	}
+	if (res.status === 404)
+		throw new NotFoundError('This backend is too old to back up its key from here');
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	return res.blob();
+}

@@ -12,6 +12,7 @@
 	import { local } from '#lib/local.svelte.ts';
 	import { verifyIdentity } from '#lib/login.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
+	import KeyBackup from '#lib/KeyBackup.svelte';
 	import People from '#lib/People.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -232,6 +233,10 @@
 				</table>
 			{/if}
 			{#if tokens.byBackend[b.id]}<People backend={b} token={tokens.byBackend[b.id] ?? ''} />{/if}
+			{#if tokens.byBackend[b.id]}<KeyBackup
+					backend={b}
+					token={tokens.byBackend[b.id] ?? ''}
+				/>{/if}
 		</section>
 	{/each}
 {/if}
