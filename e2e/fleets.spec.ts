@@ -291,6 +291,6 @@ test('rolling back: refused while destructive, then only with the name typed', a
 	await expect(confirm).toBeDisabled();
 	await dialog.getByLabel('Type the stack name to confirm').fill('photos');
 	await confirm.click();
-	await expect(page.getByText('Rolled back.')).toBeVisible();
+	await expect(page.getByText('Rolled back.', { exact: true })).toBeVisible();
 	expect(mock.rollbacks).toEqual([false, true]);
 });
