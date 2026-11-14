@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.4](https://github.com/Serraniel/nepfleet-ui/compare/v0.3.3...v0.3.4) (2026-11-14)
+
+
+### Bug Fixes
+
+* **fleets:** unlock one SSH key, then try again, before asking for the next ([#138](https://github.com/Serraniel/nepfleet-ui/issues/138)) ([db0a346](https://github.com/Serraniel/nepfleet-ui/commit/db0a34602c9933891e5e4976f856ed03bfb7479c))
+* page actions are buttons, not link-like ghost buttons ([#143](https://github.com/Serraniel/nepfleet-ui/issues/143)) ([9a4ffd3](https://github.com/Serraniel/nepfleet-ui/commit/9a4ffd35b95a2405e3feff5f242aecaf4bb4ca35))
+* the sidebar stays in place, its footer always visible ([#144](https://github.com/Serraniel/nepfleet-ui/issues/144)) ([f532768](https://github.com/Serraniel/nepfleet-ui/commit/f53276864c184e32a1103c9d3657415cbd67da62))
+
 ## [0.3.3](https://github.com/Serraniel/nepfleet-ui/compare/v0.3.2...v0.3.3) (2026-11-14)
 
 
