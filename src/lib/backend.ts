@@ -917,3 +917,44 @@ export async function setSecret(
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
 }
+
+/** An opt-in system stack, as nepfleet enable lists it (GET /api/v1/features). */
+export interface Feature {
+	name: string;
+	template: string;
+	what: string;
+	/** The stacks providing it, as name@target. */
+	stacks: string[];
+}
+
+function isFeatures(v: unknown): v is Feature[] {
+	return (
+		Array.isArray(v) &&
+		v.every((f) => {
+			if (typeof f !== 'object' || f === null) return false;
+			const o = f as Record<string, unknown>;
+			return (
+				typeof o.name === 'string' &&
+				typeof o.template === 'string' &&
+				typeof o.what === 'string' &&
+				Array.isArray(o.stacks) &&
+				o.stacks.every((s) => typeof s === 'string')
+			);
+		})
+	);
+}
+
+/** The features of a backend's fleet; an older backend has none to offer. */
+export async function fetchFeatures(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<Feature[] | null> {
+	try {
+		return await apiGet(backend, token, '/api/v1/features', isFeatures, fetcher, timeoutMs);
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}

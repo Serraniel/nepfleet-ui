@@ -27,7 +27,8 @@ import {
 	syncNow,
 	fetchSecretKeys,
 	setSecret,
-	secretKeyPattern
+	secretKeyPattern,
+	fetchFeatures
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -539,5 +540,21 @@ describe('secrets', () => {
 		);
 		expect(secretKeyPattern.test('DB_PASSWORD')).toBe(true);
 		expect(secretKeyPattern.test('1X')).toBe(false);
+	});
+});
+
+describe('fetchFeatures', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads features, and an older backend has none', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify([{ name: 'logs', template: 'dozzle', what: 'logs', stacks: ['dozzle@nas'] }])
+			)) as unknown as typeof fetch;
+		expect((await fetchFeatures(backend, 't', ok))?.[0]?.stacks).toEqual(['dozzle@nas']);
+		const old = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+		expect(await fetchFeatures(backend, 't', old)).toBeNull();
+		const odd = (async () =>
+			new Response(JSON.stringify([{ name: 'logs' }]))) as unknown as typeof fetch;
+		await expect(fetchFeatures(backend, 't', odd)).rejects.toThrow(/Unexpected/);
 	});
 });
