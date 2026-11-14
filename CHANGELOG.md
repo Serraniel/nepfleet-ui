@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.3.0](https://github.com/Serraniel/nepfleet-ui/compare/v0.2.0...v0.3.0) (2026-11-14)
+
+
+### Features
+
+* **access:** download the age key, encrypted to your public key ([#96](https://github.com/Serraniel/nepfleet-ui/issues/96)) ([dbd5e06](https://github.com/Serraniel/nepfleet-ui/commit/dbd5e068854a23ad7fe23aa77652f6947c4f75de))
+* **access:** manage API tokens from the app ([#88](https://github.com/Serraniel/nepfleet-ui/issues/88)) ([4a9f86e](https://github.com/Serraniel/nepfleet-ui/commit/4a9f86e88a752e88ae7527a13a309fc3157fc759))
+* **access:** manage people and their passkeys from the app ([#92](https://github.com/Serraniel/nepfleet-ui/issues/92)) ([0f2b51b](https://github.com/Serraniel/nepfleet-ui/commit/0f2b51bcfde4937482f6f21ec2108efa63dce297))
+* **features:** enable NepFleet's opt-in features from the app ([#87](https://github.com/Serraniel/nepfleet-ui/issues/87)) ([af9185c](https://github.com/Serraniel/nepfleet-ui/commit/af9185cb93a0cc6db7b59f6fbf3a415b76cf7035))
+* **fleets:** ask for the sudo password in the setup dialog ([#79](https://github.com/Serraniel/nepfleet-ui/issues/79)) ([571eeef](https://github.com/Serraniel/nepfleet-ui/commit/571eeefaa634c563adb9c2d0d64d923505836fa4))
+* **fleets:** set up a machine's network mounts from the app ([#102](https://github.com/Serraniel/nepfleet-ui/issues/102)) ([41b2cff](https://github.com/Serraniel/nepfleet-ui/commit/41b2cff1ea02e6e41db597cbb2f613f0a1fd1f23))
+* **fleets:** unlock SSH keys with a passphrase from the app ([#83](https://github.com/Serraniel/nepfleet-ui/issues/83)) ([688a2b2](https://github.com/Serraniel/nepfleet-ui/commit/688a2b2c90588a29817b3a94cb46f0f783647136))
+* **health:** see and run a backend's repository mirrors ([#97](https://github.com/Serraniel/nepfleet-ui/issues/97)) ([49a59df](https://github.com/Serraniel/nepfleet-ui/commit/49a59df0d4bb85033025025780c84d9e6c8bf2a9))
+* **health:** the hosts' doctor and security checks in the app ([#91](https://github.com/Serraniel/nepfleet-ui/issues/91)) ([61fc194](https://github.com/Serraniel/nepfleet-ui/commit/61fc194cdda7645fd95be8857cab6f0e9406b60f))
+* **import:** import running Compose projects as stacks from the app ([#101](https://github.com/Serraniel/nepfleet-ui/issues/101)) ([6ba136c](https://github.com/Serraniel/nepfleet-ui/commit/6ba136c5c842f6496b6437503c6907d2060a1393))
+* **native:** a prototype desktop app with native Qt controls ([#82](https://github.com/Serraniel/nepfleet-ui/issues/82)) ([bf09a69](https://github.com/Serraniel/nepfleet-ui/commit/bf09a69d83bf975998dc56dc07e7c59075376067))
+* **notifications:** events from the backends in the browser, without the daemon ([#98](https://github.com/Serraniel/nepfleet-ui/issues/98)) ([fa285df](https://github.com/Serraniel/nepfleet-ui/commit/fa285dfbb07acc5f3522899a79156b2e7093ae62))
+* **notifications:** send a test message to a backend's channels ([#89](https://github.com/Serraniel/nepfleet-ui/issues/89)) ([2abfe25](https://github.com/Serraniel/nepfleet-ui/commit/2abfe253408ce23207e5c942b959a19e5cab3b0e))
+* **stacks:** allow picked egress destinations from the stack's page ([#93](https://github.com/Serraniel/nepfleet-ui/issues/93)) ([2fb3346](https://github.com/Serraniel/nepfleet-ui/commit/2fb3346480fd61abf95f2104a470654c023255f7))
+* **stacks:** download a stack's or the fleet's SBOM ([#90](https://github.com/Serraniel/nepfleet-ui/issues/90)) ([ee8a0c4](https://github.com/Serraniel/nepfleet-ui/commit/ee8a0c49e3b20abe31f742283f345b46cbbe9be4))
+* **stacks:** find a catalogue template for a plain stack ([#99](https://github.com/Serraniel/nepfleet-ui/issues/99)) ([1de08da](https://github.com/Serraniel/nepfleet-ui/commit/1de08da15f522c228e10f9332a618ddeaa81ccbd))
+* **stacks:** restore a stack's volumes from a backup in the app ([#100](https://github.com/Serraniel/nepfleet-ui/issues/100)) ([ab7cba0](https://github.com/Serraniel/nepfleet-ui/commit/ab7cba01b0fd7c525c73c00b57e4e7918ad37545))
+* **stacks:** set, replace and remove a stack's secrets ([#86](https://github.com/Serraniel/nepfleet-ui/issues/86)) ([54bc401](https://github.com/Serraniel/nepfleet-ui/commit/54bc401bc949a0c9b2cab0be09bef0e12fa50466))
+* **stacks:** view a stack's rendered files, secrets masked ([#94](https://github.com/Serraniel/nepfleet-ui/issues/94)) ([9abbca5](https://github.com/Serraniel/nepfleet-ui/commit/9abbca578d3a41d1fdd2db1ba50a0d0f497f7e20))
+* **sync:** show each server's Git sync and sync on demand ([#85](https://github.com/Serraniel/nepfleet-ui/issues/85)) ([02030f2](https://github.com/Serraniel/nepfleet-ui/commit/02030f28db19ee0448d386e4b5d74b93ea173bed))
+* **templates:** create a stack from the template wizard ([#84](https://github.com/Serraniel/nepfleet-ui/issues/84)) ([c00565d](https://github.com/Serraniel/nepfleet-ui/commit/c00565d98c2a44188da3e7419fd075506c7617a1))
+* **updates:** run a backend's updates now and follow the log ([#95](https://github.com/Serraniel/nepfleet-ui/issues/95)) ([c662322](https://github.com/Serraniel/nepfleet-ui/commit/c662322b631d123f27a2f2704085b3a5749330fb))
+
+
+### Bug Fixes
+
+* **fleets:** offer Connect only where NepFleet runs ([#77](https://github.com/Serraniel/nepfleet-ui/issues/77)) ([12dcbe2](https://github.com/Serraniel/nepfleet-ui/commit/12dcbe27bfebe0f810a03d647bc7c812d5660771))
+
 ## [0.2.0](https://github.com/Serraniel/nepfleet-ui/compare/v0.1.0...v0.2.0) (2026-11-13)
 
 
