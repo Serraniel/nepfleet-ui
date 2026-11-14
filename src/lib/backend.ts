@@ -293,6 +293,62 @@ export async function saveStackFiles(
 	return o.commit;
 }
 
+/** What POST /api/v1/stacks takes: a stack from a template, as nepfleet new. */
+export interface NewStack {
+	template: string;
+	source?: string;
+	name?: string;
+	target?: string;
+	access?: 'domain' | 'port';
+	port?: number;
+	/** The template's inputs; secret ones are stored encrypted on the backend. */
+	values?: Record<string, string>;
+}
+
+/**
+ * Creates and commits a stack from a template, without applying it. Throws
+ * VerifyFirstError when a person must confirm with a passkey first.
+ */
+export async function createStack(
+	backend: Backend,
+	token: string,
+	req: NewStack,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 120000
+): Promise<{ name: string; commit: string; port?: number }> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify(req)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 403) {
+		const text = await res.text();
+		let verify = false;
+		try {
+			verify = (JSON.parse(text) as { verify?: unknown }).verify === true;
+		} catch {
+			/* not JSON */
+		}
+		if (verify) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError(
+			text.trim() || 'This token may not create stacks. That needs one with the edit scope.'
+		);
+	}
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { name?: unknown; commit?: unknown; port?: unknown };
+	if (typeof o.name !== 'string' || typeof o.commit !== 'string')
+		throw new Error('Unexpected response');
+	return { name: o.name, commit: o.commit, port: typeof o.port === 'number' ? o.port : undefined };
+}
+
 /** One file or image a plan changes; diff is a context diff, secrets masked. */
 export interface PlanChange {
 	path: string;
