@@ -1010,3 +1010,26 @@ export async function testChannel(
 	if (res.status === 404) throw new NotFoundError('No such channel');
 	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
 }
+
+/** A CycloneDX SBOM of a stack, or of the fleet's stacks the token sees (stack ''). */
+export async function fetchSBOM(
+	backend: Backend,
+	token: string,
+	stack: string,
+	contents = false,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 330000
+): Promise<Blob> {
+	const path = stack === '' ? '/api/v1/sbom' : `/api/v1/stacks/${encodeURIComponent(stack)}/sbom`;
+	const res = await fetcher(`${backend.url}${path}${contents ? '?contents=true' : ''}`, {
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/vnd.cyclonedx+json', ...authInit(token).headers }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (res.status === 503) throw new Error('The backend is busy with another operation; try again');
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	return res.blob();
+}

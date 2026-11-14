@@ -26,6 +26,7 @@
 	import { local } from '#lib/local.svelte.ts';
 	import { parseContextDiff } from '#lib/diff.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
+	import SBOMButton from '#lib/SBOMButton.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -267,6 +268,7 @@
 <h1>{name}</h1>
 <p>
 	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit">Edit files</a>
+	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
 {#if places.length}
 	<ul class="places" aria-label="Open elsewhere">
