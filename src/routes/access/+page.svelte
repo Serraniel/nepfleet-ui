@@ -232,7 +232,11 @@
 					</tbody>
 				</table>
 			{/if}
-			{#if tokens.byBackend[b.id]}<People backend={b} token={tokens.byBackend[b.id] ?? ''} />{/if}
+			<!-- Not when the token may not even list tokens: the reason shows once, above. -->
+			{#if tokens.byBackend[b.id] && st?.state === 'ok'}<People
+					backend={b}
+					token={tokens.byBackend[b.id] ?? ''}
+				/>{/if}
 			{#if tokens.byBackend[b.id]}<KeyBackup
 					backend={b}
 					token={tokens.byBackend[b.id] ?? ''}
