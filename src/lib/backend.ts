@@ -1033,3 +1033,110 @@ export async function fetchSBOM(
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
 	return res.blob();
 }
+
+/** An API token as the backend lists it: never its secret. */
+export interface TokenInfo {
+	id: string;
+	name: string;
+	scope: 'read' | 'apply' | 'edit' | 'admin' | 'notify';
+	stacks?: string[];
+	created: string;
+	expires: string;
+	expired: boolean;
+}
+
+function isTokenInfo(v: unknown): v is TokenInfo {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return (
+		typeof o.id === 'string' &&
+		typeof o.name === 'string' &&
+		typeof o.scope === 'string' &&
+		typeof o.expires === 'string' &&
+		typeof o.expired === 'boolean'
+	);
+}
+
+/** The backend's API tokens (admin scope). */
+export function fetchTokens(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<TokenInfo[]> {
+	return apiGet(
+		backend,
+		token,
+		'/api/v1/tokens',
+		(v: unknown): v is TokenInfo[] => Array.isArray(v) && v.every(isTokenInfo),
+		fetcher,
+		timeoutMs
+	);
+}
+
+/** Sends a change to tokens; maps the answers shared by create and revoke. */
+async function tokenRequest(
+	backend: Backend,
+	token: string,
+	path: string,
+	method: 'POST' | 'DELETE',
+	body: unknown,
+	fetcher: typeof fetch,
+	timeoutMs: number
+): Promise<Response> {
+	const res = await fetcher(`${backend.url}${path}`, {
+		method,
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Managing tokens needs an admin token, or signing in.');
+	}
+	if (res.status === 404) throw new NotFoundError('No such token');
+	if (res.status === 422 || res.status === 400) throw new Error((await res.text()).trim());
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	return res;
+}
+
+/** Creates a token; the secret comes only in this answer. */
+export async function createToken(
+	backend: Backend,
+	token: string,
+	req: { name: string; scope: TokenInfo['scope']; stacks?: string[]; days: number },
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<{ token: TokenInfo; secret: string }> {
+	const res = await tokenRequest(backend, token, '/api/v1/tokens', 'POST', req, fetcher, timeoutMs);
+	const o = (await res.json()) as { token?: unknown; secret?: unknown };
+	if (!isTokenInfo(o.token) || typeof o.secret !== 'string') throw new Error('Unexpected response');
+	return { token: o.token, secret: o.secret };
+}
+
+/** Revokes a token by its ID. */
+export async function revokeToken(
+	backend: Backend,
+	token: string,
+	id: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<void> {
+	await tokenRequest(
+		backend,
+		token,
+		`/api/v1/tokens/${encodeURIComponent(id)}`,
+		'DELETE',
+		undefined,
+		fetcher,
+		timeoutMs
+	);
+}
