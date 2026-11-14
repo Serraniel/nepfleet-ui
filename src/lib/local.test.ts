@@ -17,7 +17,8 @@ import {
 	fetchSetupPlan,
 	removeRemote,
 	setupKind,
-	startSetup
+	startSetup,
+	saveSettings
 } from './local.ts';
 
 const daemon = 'http://127.0.0.1:7481';
@@ -222,5 +223,34 @@ group('locked keys', () => {
 				reply(403, { error: "that passphrase doesn't unlock the key" })
 			)
 		).rejects.toBeInstanceOf(WrongPassphraseError);
+	});
+});
+
+group('daemon settings and mounts', () => {
+	it('saves the fleet folder and plans mounts', async () => {
+		const calls: { url: string; method: string }[] = [];
+		const fake = (async (u: string, init: RequestInit) => {
+			calls.push({ url: u, method: init.method ?? 'GET' });
+			if (u.endsWith('/v1/settings'))
+				return new Response(JSON.stringify({ fleetDir: '/home/me/fleet' }));
+			return new Response(
+				JSON.stringify({
+					kind: 'mounts',
+					steps: [{ text: 'mount nas:/media', root: true }],
+					id: 'p1'
+				})
+			);
+		}) as unknown as typeof fetch;
+		const saved = await saveSettings(
+			'http://127.0.0.1:1',
+			't',
+			{ fleetDir: '/home/me/fleet' },
+			fake
+		);
+		expect(saved.fleetDir).toBe('/home/me/fleet');
+		expect(calls[0]?.method).toBe('PUT');
+		const plan = await fetchSetupPlan('http://127.0.0.1:1', 't', 'vps', 'mounts', fake);
+		expect(plan.kind).toBe('mounts');
+		expect(calls[1]?.url).toContain('kind=mounts');
 	});
 });
