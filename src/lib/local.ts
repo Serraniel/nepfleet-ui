@@ -19,6 +19,8 @@ export interface RemoteReport {
 	swarm?: string;
 	nepfleet?: string;
 	nepfleetRunning?: boolean;
+	/** The image of a running NepFleet container (its tag is the version). */
+	nepfleetImage?: string;
 	fleet?: string;
 }
 
@@ -226,9 +228,44 @@ export async function removeRemote(
 	);
 }
 
-/** Preparing a machine (Docker, Compose, network) or installing NepFleet on it. */
-/** Preparing a machine, installing NepFleet, or its network mounts (host apply). */
-export type SetupKind = 'bootstrap' | 'install' | 'mounts';
+/**
+ * Preparing a machine, installing NepFleet, updating it to the daemon's
+ * version, or its network mounts (host apply).
+ */
+export type SetupKind = 'bootstrap' | 'install' | 'update' | 'mounts';
+
+const RELEASE = /^v?(\d+)\.(\d+)\.(\d+)$/;
+const IMAGE_TAG = /:v?(\d+\.\d+\.\d+)(@|$)/;
+
+/**
+ * The version to update a machine's NepFleet container to: the daemon's,
+ * when it's a release newer than what runs there (from the image tag).
+ */
+export function updateOffer(
+	report: RemoteReport | undefined,
+	daemonVersion: string
+): string | null {
+	const target = RELEASE.exec(daemonVersion);
+	const running = report?.nepfleetImage ? IMAGE_TAG.exec(report.nepfleetImage) : null;
+	const current = running?.[1] ? RELEASE.exec(running[1]) : null;
+	if (!target || !current) return null;
+	for (let i = 1; i <= 3; i++) {
+		const d = Number(target[i]) - Number(current[i]);
+		if (d !== 0) return d > 0 ? `${target[1]}.${target[2]}.${target[3]}` : null;
+	}
+	return null;
+}
+
+/** The control daemon's version, as GET /v1/info says. */
+export async function fetchDaemonVersion(
+	daemon: string,
+	token: string,
+	fetcher: typeof fetch = fetch
+): Promise<string> {
+	const data = await call(daemon, token, 'GET', '/v1/info', undefined, fetcher, 10000);
+	const v = (data as { version?: unknown } | undefined)?.version;
+	return typeof v === 'string' ? v : '';
+}
 
 /** One step of a setup; root steps run as root over SSH. */
 export interface SetupStep {
