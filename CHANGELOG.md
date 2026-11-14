@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.2](https://github.com/Serraniel/nepfleet-ui/compare/v0.3.1...v0.3.2) (2026-11-14)
+
+
+### Bug Fixes
+
+* **access:** offer the age key backup only when signed in as a person ([#130](https://github.com/Serraniel/nepfleet-ui/issues/130)) ([c7bbe4f](https://github.com/Serraniel/nepfleet-ui/commit/c7bbe4f9d9e28a652d630681e386a0352908edec))
+* drop the leftover planned items from the sidebar ([#128](https://github.com/Serraniel/nepfleet-ui/issues/128)) ([980e2c3](https://github.com/Serraniel/nepfleet-ui/commit/980e2c3a90ffb71d49b2810f93afa6b40a3c1b91))
+* line inline forms up, and style selects and text areas like inputs ([#131](https://github.com/Serraniel/nepfleet-ui/issues/131)) ([6853108](https://github.com/Serraniel/nepfleet-ui/commit/68531087c32c11882c26fd4e0ed7dab74a1fba4b))
+* scope errors name the scope needed and the way out, once per backend ([#129](https://github.com/Serraniel/nepfleet-ui/issues/129)) ([9386596](https://github.com/Serraniel/nepfleet-ui/commit/93865961416da28a86150c41b191ea30b148cbb1))
+* show the app's version, not "dev", in builds without APP_VERSION ([#127](https://github.com/Serraniel/nepfleet-ui/issues/127)) ([e1f6123](https://github.com/Serraniel/nepfleet-ui/commit/e1f61238b325520fe8dcdc58f42cb3f9a4cd11ce))
+
 ## [0.3.1](https://github.com/Serraniel/nepfleet-ui/compare/v0.3.0...v0.3.1) (2026-11-14)
 
 
