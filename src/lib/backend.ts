@@ -1534,3 +1534,70 @@ export function fetchMatches(
 		timeoutMs
 	);
 }
+
+/** The archives a stack can be restored from, newest first, and its volume keys. */
+export interface Backups {
+	folder: string;
+	archives: string[];
+	volumes: string[];
+}
+
+export function fetchBackups(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 130000
+): Promise<Backups> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/backups`,
+		(v: unknown): v is Backups =>
+			typeof v === 'object' &&
+			v !== null &&
+			Array.isArray((v as Record<string, unknown>).archives) &&
+			Array.isArray((v as Record<string, unknown>).volumes),
+		fetcher,
+		timeoutMs
+	);
+}
+
+/**
+ * Restores a stack's volumes from an archive, as a job (confirm repeats the
+ * stack's name). Throws VerifyFirstError when a person must confirm first.
+ */
+export async function startRestore(
+	backend: Backend,
+	token: string,
+	stack: string,
+	req: { archive: string; volumes?: string[]; confirm: string },
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<Job> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/restore`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify(req)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Restoring needs a token with the edit scope, or signing in.');
+	}
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
+	if (res.status !== 202) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const job: unknown = await res.json();
+	if (!isJob(job)) throw new Error('Unexpected response');
+	return job;
+}

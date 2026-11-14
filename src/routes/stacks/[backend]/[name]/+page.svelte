@@ -29,6 +29,7 @@
 	import { local } from '#lib/local.svelte.ts';
 	import { parseContextDiff } from '#lib/diff.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
+	import Restore from '#lib/Restore.svelte';
 	import SBOMButton from '#lib/SBOMButton.svelte';
 	import TemplateMatch from '#lib/TemplateMatch.svelte';
 	import Button from '#lib/ui/Button.svelte';
@@ -561,6 +562,7 @@
 	{/if}
 
 	{#if backend && token}<TemplateMatch {backend} {backendId} {token} stack={name} />{/if}
+	{#if backend && token}<Restore {backend} {token} stack={name} />{/if}
 
 	<section aria-labelledby="hist-h">
 		<div class="row">
