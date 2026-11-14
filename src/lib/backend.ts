@@ -1140,3 +1140,44 @@ export async function revokeToken(
 		timeoutMs
 	);
 }
+
+/** How a backend's host stands, as nepfleet doctor and doctor --security see it. */
+export interface DoctorReport {
+	host: string;
+	stacks: number;
+	checks: { name: string; status: 'ok' | 'warn' | 'fail'; detail: string; fix?: string }[];
+	security: { check: string; level: string; message: string }[];
+	securityError?: string;
+}
+
+function isDoctorReport(v: unknown): v is DoctorReport {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return (
+		typeof o.host === 'string' &&
+		Array.isArray(o.checks) &&
+		o.checks.every(
+			(c) =>
+				typeof c === 'object' &&
+				c !== null &&
+				typeof (c as Record<string, unknown>).name === 'string' &&
+				['ok', 'warn', 'fail'].includes((c as Record<string, unknown>).status as string)
+		) &&
+		Array.isArray(o.security)
+	);
+}
+
+/** Runs the backend host's checks (admin scope); null on an older backend. */
+export async function fetchDoctor(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 150000
+): Promise<DoctorReport | null> {
+	try {
+		return await apiGet(backend, token, '/api/v1/doctor', isDoctorReport, fetcher, timeoutMs);
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}

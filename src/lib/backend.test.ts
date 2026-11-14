@@ -34,7 +34,8 @@ import {
 	testChannel,
 	fetchTokens,
 	createToken,
-	revokeToken
+	revokeToken,
+	fetchDoctor
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -650,5 +651,28 @@ describe('API tokens', () => {
 			)
 		).rejects.toThrow(/days/);
 		await expect(fetchTokens(backend, 't', reply(403, 'no'))).rejects.toBeInstanceOf(ScopeError);
+	});
+});
+
+describe('fetchDoctor', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads the report, and an older backend has none', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify({
+					host: 'nas',
+					stacks: 2,
+					checks: [{ name: 'Docker', status: 'ok', detail: '29' }],
+					security: []
+				})
+			)) as unknown as typeof fetch;
+		expect((await fetchDoctor(backend, 't', ok))?.checks[0]?.status).toBe('ok');
+		const old = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+		expect(await fetchDoctor(backend, 't', old)).toBeNull();
+		const odd = (async () =>
+			new Response(
+				JSON.stringify({ host: 'nas', checks: [{ name: 'x', status: 'bad' }], security: [] })
+			)) as unknown as typeof fetch;
+		await expect(fetchDoctor(backend, 't', odd)).rejects.toThrow(/Unexpected/);
 	});
 });
