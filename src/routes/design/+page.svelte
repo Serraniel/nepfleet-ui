@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ProgressBar from '#lib/ui/ProgressBar.svelte';
 	import Spinner from '#lib/ui/Spinner.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
@@ -30,6 +31,7 @@
 		<Button disabled>Disabled</Button>
 		<Button busy>Checking…</Button>
 		<Spinner label="Loading…" />
+		<ProgressBar step={3} steps={5} text="pull, start and wait until healthy" />
 	</div>
 </section>
 

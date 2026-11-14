@@ -960,3 +960,30 @@ describe('scope errors', () => {
 		);
 	});
 });
+
+describe('job progress', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const answering = (body: unknown) =>
+		(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch;
+	const job = { id: 'j', stack: 'web', kind: 'apply', state: 'running', log: '', by: 't' };
+	it('is kept when well formed', async () => {
+		const j = await fetchJob(
+			backend,
+			't',
+			'j',
+			answering({ ...job, progress: { step: 2, steps: 4, text: 'files' } })
+		);
+		expect(j.progress).toEqual({ step: 2, steps: 4, text: 'files' });
+	});
+	it('is dropped, not the job, when odd', async () => {
+		for (const progress of [
+			{ step: 5, steps: 4, text: 'x' },
+			{ step: 0, steps: 4, text: 'x' },
+			'half'
+		]) {
+			const j = await fetchJob(backend, 't', 'j', answering({ ...job, progress }));
+			expect(j.progress).toBeUndefined();
+			expect(j.id).toBe('j');
+		}
+	});
+});
