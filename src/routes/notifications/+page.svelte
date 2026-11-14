@@ -8,6 +8,7 @@
 		requestOsPermission,
 		saveOsSettings
 	} from '#lib/notifications.ts';
+	import BackendEvents from '#lib/BackendEvents.svelte';
 	import ChannelTests from '#lib/ChannelTests.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -49,10 +50,7 @@
 </header>
 
 {#if !local.connected}
-	<EmptyState title="Not connected">
-		Notifications come through the control daemon. Connect to it on the
-		<a href="/fleets">Fleets</a> page.
-	</EmptyState>
+	<BackendEvents />
 {:else}
 	<section class="settings" aria-label="System notifications">
 		<label class="check">

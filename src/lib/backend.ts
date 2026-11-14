@@ -1453,3 +1453,43 @@ export async function mirrorNow(
 	if (!isMirrors(v)) throw new Error('Unexpected response');
 	return v;
 }
+
+/**
+ * A backend's newest events (GET /api/v1/events), newest last, at most keep:
+ * for the browser, where no control daemon merges them.
+ */
+export async function fetchEvents(
+	backend: Backend,
+	token: string,
+	keep = 200,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<import('./notifications.ts').FleetEvent[]> {
+	type E = import('./notifications.ts').FleetEvent;
+	const isEvents = (v: unknown): v is E[] =>
+		Array.isArray(v) &&
+		v.every(
+			(e) =>
+				typeof e === 'object' &&
+				e !== null &&
+				typeof (e as Record<string, unknown>).id === 'number' &&
+				typeof (e as Record<string, unknown>).title === 'string'
+		);
+	let all: E[] = [];
+	let after = 0;
+	// Oldest first, 500 a page: walk to the end, keeping the newest.
+	for (let page = 0; page < 40; page++) {
+		const got = await apiGet(
+			backend,
+			token,
+			`/api/v1/events?after=${after}&limit=500`,
+			isEvents,
+			fetcher,
+			timeoutMs
+		);
+		all = all.concat(got).slice(-keep);
+		if (got.length < 500) break;
+		after = got[got.length - 1]?.id ?? after;
+	}
+	return all;
+}
