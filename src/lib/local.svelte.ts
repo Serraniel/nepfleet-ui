@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AuthError, type Backend } from './backend.ts';
 import { backends } from './backends.svelte.ts';
+import { isDesktop, startDaemon } from './desktop.ts';
 import { type Remote, fetchEvents, fetchRemotes, markSeen, normalizeDaemonUrl } from './local.ts';
 import { type FleetEvent, atLeast, loadOsSettings, showOsNotification } from './notifications.ts';
 import { stacks, tokens } from './stacks.svelte.ts';
@@ -9,6 +10,16 @@ const URL_KEY = 'nepfleet-control-url';
 const TOKEN_KEY = 'nepfleet-control-token';
 /** How many events the page keeps in memory. */
 const KEEP_EVENTS = 500;
+/** How often the desktop app tries to start a daemon that stopped. */
+const RESTART_EVERY_MS = 30_000;
+
+/** No answer at all: nothing listens, or it hangs. Not an HTTP error. */
+export function unreachable(e: unknown): boolean {
+	return (
+		e instanceof TypeError ||
+		(e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError'))
+	);
+}
 export const DEFAULT_DAEMON = 'http://127.0.0.1:7481';
 
 /**
@@ -24,6 +35,11 @@ class Local {
 	unread = $state(0);
 	seen = $state(0);
 	eventsError = $state('');
+	/** The daemon stopped answering; what it reported before is gone. */
+	daemonDown = $state(false);
+	/** The desktop app is starting the daemon again. */
+	restarting = $state(false);
+	#lastRestart = 0;
 	#eventsLoaded = false;
 	#timer: ReturnType<typeof setInterval> | undefined;
 
@@ -56,6 +72,7 @@ class Local {
 		this.token = '';
 		this.remotes = [];
 		this.error = '';
+		this.daemonDown = false;
 		this.events = [];
 		this.unread = 0;
 		this.seen = 0;
@@ -74,11 +91,41 @@ class Local {
 		try {
 			this.remotes = await fetchRemotes(this.url, this.token);
 			this.error = '';
+			this.daemonDown = false;
 			this.sync();
 			await this.refreshEvents();
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : String(e);
 			if (e instanceof AuthError) this.disconnect();
+			else if (unreachable(e)) this.lost();
+		}
+	}
+
+	/**
+	 * The daemon is gone: its machines aren't connected any more, whatever it
+	 * said last. The desktop app starts it again, as on launch; a new daemon
+	 * has a new SSH agent, so Fleets then asks for locked keys again.
+	 */
+	private lost() {
+		this.daemonDown = true;
+		this.error = '';
+		this.remotes = [];
+		this.sync();
+		void this.restart();
+	}
+
+	private async restart() {
+		if (!isDesktop() || this.restarting) return;
+		if (Date.now() - this.#lastRestart < RESTART_EVERY_MS) return;
+		this.#lastRestart = Date.now();
+		this.restarting = true;
+		try {
+			const d = await startDaemon();
+			await this.connect(d.url, d.token, false);
+		} catch {
+			// Still down: the banner says so, and the next refresh tries again.
+		} finally {
+			this.restarting = false;
 		}
 	}
 

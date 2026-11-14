@@ -98,12 +98,32 @@
 		</footer>
 	</aside>
 	<main>
+		{#if local.daemonDown}
+			<p class="daemon-down" role="alert">
+				{#if local.restarting}
+					NepFleet's control daemon on this computer stopped; starting it again…
+				{:else if isDesktop()}
+					NepFleet's control daemon on this computer stopped, so your machines aren't connected. The
+					app keeps trying to start it.
+				{:else}
+					NepFleet's control daemon on this computer isn't answering, so your machines aren't
+					connected. Start it with <code>nepfleet control</code>.
+				{/if}
+			</p>
+		{/if}
 		{@render children()}
 	</main>
 	<Toaster />
 </div>
 
 <style>
+	.daemon-down {
+		margin: 0 0 1rem;
+		padding: 0.6rem 0.8rem;
+		border: 1px solid var(--err);
+		border-radius: 8px;
+		color: var(--err);
+	}
 	.shell {
 		display: grid;
 		grid-template-columns: 220px 1fr;
