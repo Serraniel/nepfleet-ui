@@ -115,14 +115,15 @@
 		unlockError = '';
 		try {
 			await unlockKey(local.url, local.token, key, given);
-			unlockKeys = unlockKeys.slice(1);
-			if (unlockKeys.length === 0) {
-				unlockOpen = false;
-				const retry = afterUnlock;
-				afterUnlock = null;
-				if (retry) await retry();
-				else await local.refresh();
-			}
+			// One key is usually enough: try again with it. Only if the machine
+			// still refuses does the next refusal name the remaining keys (those
+			// already unlocked aren't listed again), and this asks for them.
+			unlockKeys = [];
+			unlockOpen = false;
+			const retry = afterUnlock;
+			afterUnlock = null;
+			if (retry) await retry();
+			else await local.refresh();
 		} catch (e) {
 			unlockError =
 				e instanceof WrongPassphraseError
@@ -473,8 +474,10 @@ nepfleet control token</code
 <Dialog bind:open={unlockOpen} title="Unlock your SSH key">
 	<form id="unlock-form" onsubmit={submitUnlock}>
 		<p>
-			<code>{unlockKeys[0]}</code> has a passphrase. NepFleet's SSH runs in the background, without a
-			terminal to ask on, so it keeps the key unlocked in an SSH agent for 8 hours.
+			<code>{unlockKeys[0]}</code> has a passphrase. NepFleet's SSH runs in the background, without
+			a terminal to ask on, so it keeps the key unlocked in an SSH agent for 8 hours.
+			{#if unlockKeys.length > 1}If the machine doesn't take this key, NepFleet asks for the next
+				one ({unlockKeys.slice(1).join(', ')}).{/if}
 		</p>
 		<label class="password">
 			Passphrase
