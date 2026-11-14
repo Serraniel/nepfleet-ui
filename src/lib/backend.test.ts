@@ -44,7 +44,8 @@ import {
 	backupKey,
 	fetchMirrors,
 	mirrorNow,
-	fetchEvents
+	fetchEvents,
+	fetchMatches
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -843,5 +844,30 @@ describe('fetchEvents', () => {
 		expect(got.length).toBe(10);
 		expect(got.at(-1)?.id).toBe(503);
 		expect(urls[1]).toContain('after=500');
+	});
+});
+
+describe('fetchMatches', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads matches and refuses odd answers', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify({
+					matches: [
+						{
+							source: 'official',
+							name: 'jellyfin',
+							version: '1.0.0',
+							same: [{ image: 'jellyfin/jellyfin', stack: '10.9', template: '10.10' }],
+							onlyStack: [],
+							onlyTemplate: []
+						}
+					]
+				})
+			)) as unknown as typeof fetch;
+		expect((await fetchMatches(backend, 't', 'media', ok)).matches[0]?.name).toBe('jellyfin');
+		const odd = (async () =>
+			new Response(JSON.stringify({ matches: [{}] }))) as unknown as typeof fetch;
+		await expect(fetchMatches(backend, 't', 'media', odd)).rejects.toThrow(/Unexpected/);
 	});
 });
