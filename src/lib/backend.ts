@@ -1255,3 +1255,48 @@ export async function removeAccess(
 	if (res.status === 404) throw new NotFoundError('No such person');
 	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
 }
+
+/**
+ * Adds hosts, addresses or ranges to a stack's egress allow list, in a commit.
+ * It doesn't apply. Throws VerifyFirstError when a person must confirm first.
+ */
+export async function allowEgress(
+	backend: Backend,
+	token: string,
+	stack: string,
+	add: string[],
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<{ commit?: string; added: string[] }> {
+	const res = await fetcher(
+		`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/egress/allow`,
+		{
+			method: 'POST',
+			signal: AbortSignal.timeout(timeoutMs),
+			credentials: authInit(token).credentials,
+			headers: {
+				Accept: 'application/json',
+				'Content-Type': 'application/json',
+				...authInit(token).headers
+			},
+			body: JSON.stringify({ add })
+		}
+	);
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Changing the allow list needs a token with the edit scope.');
+	}
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown; added?: unknown };
+	if (!Array.isArray(o.added)) throw new Error('Unexpected response');
+	return {
+		commit: typeof o.commit === 'string' ? o.commit : undefined,
+		added: o.added as string[]
+	};
+}

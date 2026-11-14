@@ -20,9 +20,12 @@
 		stackPlaces,
 		stackRelations,
 		startApply,
-		startRollback
+		startRollback,
+		allowEgress,
+		VerifyFirstError
 	} from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { verifyIdentity } from '#lib/login.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { parseContextDiff } from '#lib/diff.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
@@ -84,6 +87,38 @@
 			egress = { state: 'ok', value: await fetchEgress(backend, token, name) };
 		} catch (e) {
 			egress = failed(e);
+		}
+	}
+
+	// Allowing what egress recorded or refused: a commit, then the plan shows it.
+	let egressPicked = $state<Record<string, boolean>>({});
+	let egressSaving = $state(false);
+	let egressNote = $state('');
+	async function allowPicked() {
+		if (!backend || !token) return;
+		const add = Object.keys(egressPicked).filter((k) => egressPicked[k]);
+		if (add.length === 0) return;
+		egressSaving = true;
+		egressNote = '';
+		const send = () => allowEgress(backend, token, name, add);
+		try {
+			let res;
+			try {
+				res = await send();
+			} catch (e) {
+				if (!(e instanceof VerifyFirstError)) throw e;
+				await verifyIdentity(backend);
+				res = await send();
+			}
+			egressPicked = {};
+			egressNote = res.commit
+				? `Allowed ${res.added.join(', ')} in ${res.commit.slice(0, 7)}. Apply the pending change to use it.`
+				: 'All of them were allowed already.';
+			await loadPlan();
+		} catch (e) {
+			egressNote = e instanceof Error ? e.message : String(e);
+		} finally {
+			egressSaving = false;
 		}
 	}
 
@@ -494,15 +529,28 @@
 					{egress.value.mode === 'enforce' ? 'Refused:' : 'Went to, and not yet allowed:'}
 				</p>
 				<ul class="updates">
-					{#each egress.value.hosts as h (h)}<li><code>{h}</code></li>{/each}
+					{#each egress.value.hosts as h (h)}<li>
+							<label
+								><input type="checkbox" bind:checked={egressPicked[h]} /> <code>{h}</code></label
+							>
+						</li>{/each}
 					{#each egress.value.addresses as a (a)}<li>
-							<code>{a}</code> <span class="muted">no name seen; an address may change</span>
+							<label
+								><input type="checkbox" bind:checked={egressPicked[a]} /> <code>{a}</code></label
+							>
+							<span class="muted">no name seen; an address may change</span>
 						</li>{/each}
 				</ul>
 				<p class="muted">
-					Allow what it needs under <code>spec.egress.allow</code> in its stack.yaml;
-					<code>nepfleet egress suggest {name}</code> prints it ready to paste.
+					Pick only what it needs: this is what it did, not what it should do. Allowing adds them to <code
+						>spec.egress.allow</code
+					> in its stack.yaml, in a commit in your name.
 				</p>
+				<Button
+					disabled={egressSaving || !Object.values(egressPicked).some(Boolean)}
+					onclick={allowPicked}>Allow selected</Button
+				>
+				{#if egressNote}<p role="status">{egressNote}</p>{/if}
 			{/if}
 		</section>
 	{/if}
