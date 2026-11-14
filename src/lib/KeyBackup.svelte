@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type Backend, VerifyFirstError, backupKey } from '#lib/backend.ts';
+	import { type Backend, SESSION, VerifyFirstError, backupKey } from '#lib/backend.ts';
 	import { saveBlob } from '#lib/download.ts';
 	import { verifyIdentity } from '#lib/login.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -54,17 +54,28 @@
 	the file somewhere else. Restore with <code>age -d -i ~/.ssh/id_ed25519</code> (or your age identity).
 	Only a person signed in can do this, and the fleet's notification channels hear of it.
 </p>
-<label class="keys"
-	>Public keys, one per line
-	<textarea bind:value={keys} rows="3" spellcheck="false" placeholder="ssh-ed25519 AAAA… you@laptop"
-	></textarea>
-</label>
-<Button disabled={busy || !shapeOK} onclick={download}>Download encrypted key</Button>
-{#if done}<p role="status">
-		Downloaded <code>nepfleet-age-key.age</code>. Move it off this computer's downloads folder to
-		where you keep backups.
-	</p>{/if}
-{#if error}<p class="error" role="alert">{error}</p>{/if}
+{#if token !== SESSION}
+	<p class="muted">
+		The backend gives its key only to a person signed in with a passkey, never to an API token, so
+		it can't be done through this connection. Sign in to the backend on the Stacks page (or its web
+		UI), or run <code>nepfleet key backup --out FILE</code> on the host.
+	</p>
+{:else}
+	<label class="keys"
+		>Public keys, one per line
+		<textarea
+			bind:value={keys}
+			rows="3"
+			spellcheck="false"
+			placeholder="ssh-ed25519 AAAA… you@laptop"></textarea>
+	</label>
+	<Button disabled={busy || !shapeOK} onclick={download}>Download encrypted key</Button>
+	{#if done}<p role="status">
+			Downloaded <code>nepfleet-age-key.age</code>. Move it off this computer's downloads folder to
+			where you keep backups.
+		</p>{/if}
+	{#if error}<p class="error" role="alert">{error}</p>{/if}
+{/if}
 
 <style>
 	.keys {
