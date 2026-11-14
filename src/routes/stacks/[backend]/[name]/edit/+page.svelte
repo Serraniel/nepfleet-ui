@@ -14,6 +14,7 @@
 	import { backends } from '#lib/backends.svelte.ts';
 	import { verifyIdentity } from '#lib/login.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
+	import Secrets from '#lib/Secrets.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
@@ -118,7 +119,7 @@
 	<p class="muted">
 		Saving makes one commit in the fleet repository, in your name. It doesn't apply: review the
 		changes under Pending changes on the stack's page, then apply them there. Encrypted values
-		aren't shown here.
+		aren't shown: set or replace them under Secrets below.
 	</p>
 </header>
 
@@ -182,6 +183,7 @@
 			<a href={stackHref}>Review and apply it on the stack's page</a>.
 		</p>
 	{/if}
+	<Secrets {backend} {token} stack={name} />
 {/if}
 
 <style>

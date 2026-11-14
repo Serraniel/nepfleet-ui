@@ -843,3 +843,77 @@ export async function syncNow(
 		);
 	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
 }
+
+/** The secrets path of a stack, or of the fleet for stack ''. */
+const secretsPath = (stack: string) =>
+	stack === '' ? '/api/v1/secrets' : `/api/v1/stacks/${encodeURIComponent(stack)}/secrets`;
+
+/** A secret's key is a variable name, as the backend accepts it. */
+export const secretKeyPattern = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+
+/** The keys of a stack's encrypted values (or the fleet's, for ''), never the values. */
+export function fetchSecretKeys(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<string[]> {
+	return apiGet(
+		backend,
+		token,
+		secretsPath(stack),
+		(v: unknown): v is { keys: string[] } =>
+			typeof v === 'object' &&
+			v !== null &&
+			Array.isArray((v as Record<string, unknown>).keys) &&
+			((v as Record<string, unknown>).keys as unknown[]).every((k) => typeof k === 'string'),
+		fetcher,
+		timeoutMs
+	).then((o) => o.keys);
+}
+
+/**
+ * Stores (value) or removes (null) one secret, encrypted, in a commit. The
+ * backend never sends a value back. Throws VerifyFirstError when a person must
+ * confirm with a passkey first.
+ */
+export async function setSecret(
+	backend: Backend,
+	token: string,
+	stack: string,
+	key: string,
+	value: string | null,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	const res = await fetcher(`${backend.url}${secretsPath(stack)}/${encodeURIComponent(key)}`, {
+		method: value === null ? 'DELETE' : 'PUT',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: value === null ? undefined : JSON.stringify({ value })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError(
+			stack === ''
+				? 'Fleet-wide secrets need an admin token.'
+				: 'This token may not change secrets. That needs one with the edit scope.'
+		);
+	}
+	if (res.status === 404)
+		throw new NotFoundError(value === null ? 'No such secret' : 'No such stack');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown };
+	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
+	return o.commit;
+}
