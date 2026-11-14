@@ -62,10 +62,8 @@
 						{@const r = result[`${b.id}/${c}`]}
 						<li>
 							<code>{c}</code>
-							<Button
-								variant="ghost"
-								disabled={sending[`${b.id}/${c}`]}
-								onclick={() => test(b.id, c)}>Send test</Button
+							<Button disabled={sending[`${b.id}/${c}`]} onclick={() => test(b.id, c)}
+								>Send test</Button
 							>
 							{#if r}<span class:error={!r.ok} class:muted={r.ok} role="status">{r.text}</span>{/if}
 						</li>

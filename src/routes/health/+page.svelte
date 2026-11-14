@@ -60,9 +60,7 @@
 		{@const st = byBackend[b.id]}
 		<section aria-label={b.label ?? b.url}>
 			<h2>{b.label ?? new URL(b.url).host}</h2>
-			<Button variant="ghost" disabled={st?.state === 'loading'} onclick={() => run(b.id)}
-				>Check again</Button
-			>
+			<Button disabled={st?.state === 'loading'} onclick={() => run(b.id)}>Check again</Button>
 			{#if !st || st.state === 'loading'}
 				<p class="muted" role="status">Checking the host…</p>
 			{:else if st.state === 'error'}

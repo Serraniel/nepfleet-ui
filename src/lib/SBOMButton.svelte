@@ -27,7 +27,6 @@
 </script>
 
 <Button
-	variant="ghost"
 	disabled={busy}
 	onclick={download}
 	title="The images it runs, as a CycloneDX software bill of materials"

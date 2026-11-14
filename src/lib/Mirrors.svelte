@@ -54,7 +54,7 @@
 			</li>
 		{/each}
 	</ul>
-	<Button variant="ghost" disabled={busy} onclick={push}>{busy ? 'Pushing…' : 'Mirror now'}</Button>
+	<Button disabled={busy} onclick={push}>{busy ? 'Pushing…' : 'Mirror now'}</Button>
 {/if}
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 

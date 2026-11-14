@@ -55,7 +55,7 @@
 		Add an API token for a backend on the <a href="/stacks">Stacks</a> page.
 	</EmptyState>
 {:else}
-	<Button variant="ghost" onclick={loadAll}>Refresh</Button>
+	<Button onclick={loadAll}>Refresh</Button>
 	{#each connected as b (b.id)}
 		{@const st = byBackend[b.id]}
 		<section aria-label={b.label ?? b.url}>
