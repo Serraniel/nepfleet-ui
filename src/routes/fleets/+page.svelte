@@ -13,6 +13,9 @@
 		remoteAction,
 		removeRemote,
 		setupKind,
+		LockedKeyError,
+		WrongPassphraseError,
+		unlockKey,
 		canConnect,
 		startSetup
 	} from '#lib/local.ts';
@@ -78,6 +81,56 @@
 		}
 	}
 
+	// Unlocking SSH keys with a passphrase: the daemon's ssh runs without a
+	// terminal, so it asks here, then runs what needed the key again.
+	let unlockOpen = $state(false);
+	let unlockKeys = $state<string[]>([]);
+	let passphrase = $state('');
+	let unlockError = $state('');
+	let unlocking = $state(false);
+	let afterUnlock: (() => Promise<void>) | null = null;
+	$effect(() => {
+		if (!unlockOpen) passphrase = '';
+	});
+
+	function askUnlock(keys: string[], retry: (() => Promise<void>) | null) {
+		unlockKeys = keys;
+		unlockError = '';
+		passphrase = '';
+		afterUnlock = retry;
+		unlockOpen = true;
+	}
+
+	async function submitUnlock(event: SubmitEvent) {
+		event.preventDefault();
+		const key = unlockKeys[0];
+		if (!key || !passphrase) return;
+		const given = passphrase;
+		passphrase = '';
+		unlocking = true;
+		unlockError = '';
+		try {
+			await unlockKey(local.url, local.token, key, given);
+			unlockKeys = unlockKeys.slice(1);
+			if (unlockKeys.length === 0) {
+				unlockOpen = false;
+				const retry = afterUnlock;
+				afterUnlock = null;
+				if (retry) await retry();
+				else await local.refresh();
+			}
+		} catch (e) {
+			unlockError =
+				e instanceof WrongPassphraseError
+					? "That passphrase doesn't unlock the key; try again."
+					: e instanceof Error
+						? e.message
+						: String(e);
+		} finally {
+			unlocking = false;
+		}
+	}
+
 	async function add(event: SubmitEvent) {
 		event.preventDefault();
 		adding = true;
@@ -88,6 +141,16 @@
 			name = '';
 			await local.refresh();
 		} catch (e) {
+			if (e instanceof LockedKeyError) {
+				// Unlock, then add again with what was typed.
+				const [a, n] = [address, name];
+				askUnlock(e.keys, async () => {
+					address = a;
+					name = n;
+					await add(new SubmitEvent('submit'));
+				});
+				return;
+			}
 			addError = e instanceof Error ? e.message : String(e);
 		} finally {
 			adding = false;
@@ -147,6 +210,10 @@
 		try {
 			setupPlan = await fetchSetupPlan(local.url, local.token, r.name, kind);
 		} catch (e) {
+			if (e instanceof LockedKeyError) {
+				askUnlock(e.keys, () => planSetup(r));
+				return;
+			}
 			setupError = e instanceof Error ? e.message : String(e);
 		} finally {
 			planning = false;
@@ -300,6 +367,15 @@ nepfleet control token</code
 					{#if r.next}<p class="muted">{r.next}</p>{/if}
 					{#if r.tunnelError}<p class="error">{r.tunnelError}</p>{/if}
 					{#if r.error}<p class="error">Last check failed: {r.error}</p>{/if}
+					{#if r.lockedKeys?.length}
+						<p>
+							<Button
+								variant="primary"
+								onclick={() => askUnlock(r.lockedKeys ?? [], () => act(r, 'refresh'))}
+								>Unlock key…</Button
+							>
+						</p>
+					{/if}
 					<div class="actions">
 						{#if r.tunnel === 'up'}
 							<a href="/stacks">Stacks</a>
@@ -335,6 +411,34 @@ nepfleet control token</code
 		</ul>
 	{/if}
 {/if}
+
+<Dialog bind:open={unlockOpen} title="Unlock your SSH key">
+	<form id="unlock-form" onsubmit={submitUnlock}>
+		<p>
+			<code>{unlockKeys[0]}</code> has a passphrase. NepFleet's SSH runs in the background, without a
+			terminal to ask on, so it keeps the key unlocked in an SSH agent for 8 hours.
+		</p>
+		<label class="password">
+			Passphrase
+			<input
+				type="password"
+				autocomplete="off"
+				spellcheck="false"
+				bind:value={passphrase}
+				disabled={unlocking}
+			/>
+			<span class="muted">Sent to the NepFleet daemon on this computer only, and kept nowhere.</span
+			>
+		</label>
+		{#if unlockError}<p class="error" role="alert">{unlockError}</p>{/if}
+	</form>
+	{#snippet actions()}
+		<Button variant="ghost" onclick={() => (unlockOpen = false)}>Cancel</Button>
+		<Button variant="primary" type="submit" form="unlock-form" disabled={unlocking || !passphrase}
+			>{unlocking ? 'Unlocking…' : 'Unlock'}</Button
+		>
+	{/snippet}
+</Dialog>
 
 <Dialog bind:open={setupOpen} title="{setupTitle(setupPlan)} on {setupFor?.name}">
 	{#if planning}

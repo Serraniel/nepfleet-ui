@@ -33,6 +33,8 @@ export interface Remote {
 	connect?: boolean;
 	tunnel?: 'off' | 'connecting' | 'up' | 'down';
 	tunnelError?: string;
+	/** Keys with a passphrase the last check or the tunnel needed unlocked. */
+	lockedKeys?: string[];
 }
 
 function isRemote(v: unknown): v is Remote {
@@ -55,6 +57,41 @@ export function normalizeDaemonUrl(input: string): string {
 }
 
 /** Calls the daemon. */
+/** SSH refused the login, and these keys need their passphrase first. */
+export class LockedKeyError extends Error {
+	constructor(
+		message: string,
+		readonly keys: string[]
+	) {
+		super(message);
+		this.name = 'LockedKeyError';
+	}
+}
+
+/** The passphrase didn't unlock the key. */
+export class WrongPassphraseError extends Error {}
+
+/**
+ * Unlocks an SSH key into the daemon's agent for 8 hours. The passphrase goes
+ * to the daemon for this call only; nothing here keeps it.
+ */
+export async function unlockKey(
+	daemon: string,
+	token: string,
+	path: string,
+	passphrase: string,
+	fetcher: typeof fetch = fetch
+): Promise<void> {
+	try {
+		await call(daemon, token, 'POST', '/v1/keys/unlock', { path, passphrase }, fetcher, 40000);
+	} catch (e) {
+		if (e instanceof Error && /doesn.t unlock/.test(e.message)) {
+			throw new WrongPassphraseError(e.message);
+		}
+		throw e;
+	}
+}
+
 async function call(
 	daemon: string,
 	token: string,
@@ -80,6 +117,10 @@ async function call(
 	if (!res.ok) {
 		const msg = (data as { error?: unknown } | undefined)?.error;
 		const text = typeof msg === 'string' ? msg : `HTTP ${res.status}`;
+		const locked = (data as { lockedKeys?: unknown } | undefined)?.lockedKeys;
+		if (Array.isArray(locked) && locked.length && locked.every((k) => typeof k === 'string')) {
+			throw new LockedKeyError(text, locked as string[]);
+		}
 		if (res.status === 404) throw new NotFoundError(text);
 		if (res.status === 409) throw new ConflictError(text);
 		throw new Error(text);
