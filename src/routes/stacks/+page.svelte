@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import SBOMButton from '#lib/SBOMButton.svelte';
 	import { onMount } from 'svelte';
 	import { backends } from '#lib/backends.svelte.ts';
@@ -133,7 +134,7 @@
 							{tokenError[backend.id]}
 						</p>{/if}
 				{:else if st.state === 'loading'}
-					<p class="muted">Loading…</p>
+					<p><Spinner label="Loading…" /></p>
 				{:else if st.state === 'error'}
 					<p class="error" role="alert">{st.error}</p>
 					<Button onclick={() => stacks.load(backend)}>Retry</Button>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import DiffView from '#lib/ui/DiffView.svelte';
@@ -27,6 +28,8 @@
 		<Button variant="danger">Delete stack</Button>
 		<Button variant="ghost">Ghost</Button>
 		<Button disabled>Disabled</Button>
+		<Button busy>Checking…</Button>
+		<Spinner label="Loading…" />
 	</div>
 </section>
 

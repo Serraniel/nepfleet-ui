@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onMount } from 'svelte';
 	import { fetchChannels, testChannel } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
@@ -49,7 +50,7 @@
 			{@const cs = byBackend[b.id]}
 			<h3>{b.label ?? new URL(b.url).host}</h3>
 			{#if cs === undefined}
-				<p class="muted">Loading…</p>
+				<p><Spinner label="Loading…" /></p>
 			{:else if cs === null}
 				<p class="muted">This backend's NepFleet is too old to list channels.</p>
 			{:else if 'error' in cs}
@@ -62,8 +63,7 @@
 						{@const r = result[`${b.id}/${c}`]}
 						<li>
 							<code>{c}</code>
-							<Button disabled={sending[`${b.id}/${c}`]} onclick={() => test(b.id, c)}
-								>Send test</Button
+							<Button busy={sending[`${b.id}/${c}`]} onclick={() => test(b.id, c)}>Send test</Button
 							>
 							{#if r}<span class:error={!r.ok} class:muted={r.ok} role="status">{r.text}</span>{/if}
 						</li>

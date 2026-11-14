@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import {
 		type Backend,
 		ConflictError,
@@ -98,7 +99,7 @@
 	{#if loadError}
 		<p class="error" role="alert">{loadError}</p>
 	{:else if keys === null}
-		<p class="muted">Loading…</p>
+		<p><Spinner label="Loading…" /></p>
 	{:else if keys.length === 0}
 		<p class="muted">No secrets yet.</p>
 	{:else}

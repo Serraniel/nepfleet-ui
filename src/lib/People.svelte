@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import {
 		type Backend,
 		type UserInfo,
@@ -51,7 +52,7 @@
 
 <h3>People</h3>
 {#if users === undefined && !error}
-	<p class="muted">Loading…</p>
+	<p><Spinner label="Loading…" /></p>
 {:else if users === null}
 	<p class="muted">No accounts on this backend: it signs in with tokens only.</p>
 {:else if users}

@@ -38,7 +38,8 @@
 	let name = $state('');
 	let adding = $state(false);
 	let addError = $state('');
-	let busy = $state<Record<string, boolean>>({});
+	/** Per machine: the action running on it, if any. */
+	let busy = $state<Record<string, string>>({});
 	let actionError = $state('');
 	let removing = $state<Remote | null>(null);
 	let removeOpen = $state(false);
@@ -163,7 +164,7 @@
 	}
 
 	async function act(r: Remote, action: 'refresh' | 'connect' | 'disconnect') {
-		busy[r.name] = true;
+		busy[r.name] = action;
 		actionError = '';
 		try {
 			await remoteAction(local.url, local.token, r.name, action);
@@ -171,7 +172,7 @@
 		} catch (e) {
 			actionError = `${r.name}: ${e instanceof Error ? e.message : String(e)}`;
 		} finally {
-			busy[r.name] = false;
+			delete busy[r.name];
 		}
 	}
 
@@ -179,7 +180,7 @@
 		const r = removing;
 		if (!r) return;
 		removeOpen = false;
-		busy[r.name] = true;
+		busy[r.name] = 'remove';
 		actionError = '';
 		try {
 			await removeRemote(local.url, local.token, r.name);
@@ -187,7 +188,7 @@
 		} catch (e) {
 			actionError = `${r.name}: ${e instanceof Error ? e.message : String(e)}`;
 		} finally {
-			busy[r.name] = false;
+			delete busy[r.name];
 		}
 	}
 
@@ -345,7 +346,7 @@ nepfleet control token</code
 				required
 			/>
 			<label class="check"><input type="checkbox" bind:checked={keep} /> Keep for this tab</label>
-			<Button variant="primary" type="submit" disabled={connecting}>
+			<Button variant="primary" type="submit" busy={connecting}>
 				{connecting ? 'Connecting…' : 'Connect'}
 			</Button>
 		</form>
@@ -396,7 +397,7 @@ nepfleet control token</code
 			/>
 			<label for="add-name" class="sr-only">Name (optional)</label>
 			<input id="add-name" placeholder="Name (optional)" bind:value={name} autocomplete="off" />
-			<Button variant="primary" type="submit" disabled={adding}>
+			<Button variant="primary" type="submit" busy={adding}>
 				{adding ? 'Looking at it…' : 'Add'}
 			</Button>
 		</form>
@@ -435,32 +436,43 @@ nepfleet control token</code
 							<a href="/stacks">Stacks</a>
 						{/if}
 						{#if setupKind(r.report)}
-							<Button variant="primary" onclick={() => openSetup(r)} disabled={busy[r.name]}
+							<Button variant="primary" onclick={() => openSetup(r)} disabled={!!busy[r.name]}
 								>{setupKind(r.report) === 'bootstrap'
 									? 'Prepare this machine…'
 									: 'Install NepFleet…'}</Button
 							>
 						{/if}
 						{#if r.connect}
-							<Button onclick={() => act(r, 'disconnect')} disabled={busy[r.name]}
-								>Disconnect</Button
+							<Button
+								onclick={() => act(r, 'disconnect')}
+								disabled={!!busy[r.name]}
+								busy={busy[r.name] === 'disconnect'}>Disconnect</Button
 							>
 						{:else if canConnect(r.report)}
-							<Button onclick={() => act(r, 'connect')} disabled={busy[r.name]}>Connect</Button>
+							<Button
+								onclick={() => act(r, 'connect')}
+								disabled={!!busy[r.name]}
+								busy={busy[r.name] === 'connect'}>Connect</Button
+							>
 						{/if}
 						{#if r.report && !setupKind(r.report)}
-							<Button onclick={() => openSetup(r, 'mounts')} disabled={busy[r.name]}
+							<Button onclick={() => openSetup(r, 'mounts')} disabled={!!busy[r.name]}
 								>Network mounts…</Button
 							>
 						{/if}
-						<Button onclick={() => act(r, 'refresh')} disabled={busy[r.name]}>Check again</Button>
+						<Button
+							onclick={() => act(r, 'refresh')}
+							disabled={!!busy[r.name]}
+							busy={busy[r.name] === 'refresh'}>Check again</Button
+						>
 						<Button
 							variant="ghost"
 							onclick={() => {
 								removing = r;
 								removeOpen = true;
 							}}
-							disabled={busy[r.name]}>Remove…</Button
+							disabled={!!busy[r.name]}
+							busy={busy[r.name] === 'remove'}>Remove…</Button
 						>
 					</div>
 				</li>
@@ -493,8 +505,12 @@ nepfleet control token</code
 	</form>
 	{#snippet actions()}
 		<Button variant="ghost" onclick={() => (unlockOpen = false)}>Cancel</Button>
-		<Button variant="primary" type="submit" form="unlock-form" disabled={unlocking || !passphrase}
-			>{unlocking ? 'Unlocking…' : 'Unlock'}</Button
+		<Button
+			variant="primary"
+			type="submit"
+			form="unlock-form"
+			busy={unlocking}
+			disabled={!passphrase}>{unlocking ? 'Unlocking…' : 'Unlock'}</Button
 		>
 	{/snippet}
 </Dialog>

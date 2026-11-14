@@ -99,7 +99,7 @@
 		{/each}
 	</section>
 	<h2>What's new</h2>
-	<Button onclick={checkAll} disabled={checking}
+	<Button onclick={checkAll} busy={checking}
 		>{checking ? 'Checking…' : rows.length ? 'Check again' : 'Check every stack'}</Button
 	>
 	<p class="muted">It asks each image's registry, stack by stack, so it takes a while.</p>

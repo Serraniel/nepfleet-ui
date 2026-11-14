@@ -114,7 +114,7 @@
 					{#if s.applied?.length}
 						<p class="muted">Applied: {s.applied.join(', ')}</p>
 					{/if}
-					<Button onclick={() => now(b.id)} disabled={!!asking[b.id]}>Sync now</Button>
+					<Button onclick={() => now(b.id)} busy={!!asking[b.id]}>Sync now</Button>
 				{/if}
 				{#if asking[b.id]}<p class="muted" role="status">{asking[b.id]}</p>{/if}
 			{/if}
