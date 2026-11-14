@@ -160,6 +160,8 @@ export interface DoctorCheck {
 	status: 'ok' | 'warn' | 'fail';
 	detail?: string;
 	fix?: string;
+	/** A setup kind that applies the fix as a reviewed plan (start). */
+	action?: 'start';
 }
 
 function isDoctorCheck(v: unknown): v is DoctorCheck {
@@ -169,7 +171,8 @@ function isDoctorCheck(v: unknown): v is DoctorCheck {
 		typeof c.name === 'string' &&
 		(c.status === 'ok' || c.status === 'warn' || c.status === 'fail') &&
 		(c.detail === undefined || typeof c.detail === 'string') &&
-		(c.fix === undefined || typeof c.fix === 'string')
+		(c.fix === undefined || typeof c.fix === 'string') &&
+		(c.action === undefined || c.action === 'start')
 	);
 }
 
@@ -232,7 +235,7 @@ export async function removeRemote(
  * Preparing a machine, installing NepFleet, updating it to the daemon's
  * version, or its network mounts (host apply).
  */
-export type SetupKind = 'bootstrap' | 'install' | 'update' | 'mounts';
+export type SetupKind = 'bootstrap' | 'install' | 'update' | 'start' | 'mounts';
 
 const RELEASE = /^v?(\d+)\.(\d+)\.(\d+)$/;
 const IMAGE_TAG = /:v?(\d+\.\d+\.\d+)(@|$)/;
