@@ -59,6 +59,9 @@
 				href="/maintenance"
 				aria-current={page.url.pathname === '/maintenance' ? 'page' : undefined}>Maintenance</a
 			>
+			<a href="/access" aria-current={page.url.pathname === '/access' ? 'page' : undefined}
+				>Access</a
+			>
 			<a
 				href="/notifications"
 				aria-current={page.url.pathname === '/notifications' ? 'page' : undefined}

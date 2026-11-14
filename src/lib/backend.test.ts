@@ -31,7 +31,10 @@ import {
 	fetchFeatures,
 	fetchSBOM,
 	fetchChannels,
-	testChannel
+	testChannel,
+	fetchTokens,
+	createToken,
+	revokeToken
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -599,5 +602,53 @@ describe('fetchSBOM', () => {
 		]);
 		const busy = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
 		await expect(fetchSBOM(backend, 't', 'web', false, busy)).rejects.toThrow(/busy/);
+	});
+});
+
+describe('API tokens', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const info = {
+		id: 'abcd1234',
+		name: 'ci',
+		scope: 'apply',
+		created: '2026-01-01T00:00:00Z',
+		expires: '2026-04-01T00:00:00Z',
+		expired: false
+	};
+	it('lists, creates with the secret once, revokes, and names refusals', async () => {
+		const list = (async () => new Response(JSON.stringify([info]))) as unknown as typeof fetch;
+		expect((await fetchTokens(backend, 't', list))[0]?.name).toBe('ci');
+		let sent = '';
+		const made = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response(JSON.stringify({ token: info, secret: 'nft_x' }), { status: 201 });
+		}) as unknown as typeof fetch;
+		const c = await createToken(backend, 't', { name: 'ci', scope: 'apply', days: 90 }, made);
+		expect(c.secret).toBe('nft_x');
+		expect(JSON.parse(sent)).toEqual({ name: 'ci', scope: 'apply', days: 90 });
+		let method = '';
+		const gone = (async (_u: string, init: RequestInit) => {
+			method = init.method ?? '';
+			return new Response(null, { status: 204 });
+		}) as unknown as typeof fetch;
+		await revokeToken(backend, 't', 'abcd1234', gone);
+		expect(method).toBe('DELETE');
+		const reply = (status: number, body: unknown) =>
+			(async () =>
+				new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+					status
+				})) as unknown as typeof fetch;
+		await expect(
+			revokeToken(backend, 't', 'x', reply(403, { verify: true }))
+		).rejects.toBeInstanceOf(VerifyFirstError);
+		await expect(
+			createToken(
+				backend,
+				't',
+				{ name: 'x', scope: 'admin', days: 0 },
+				reply(422, 'days is 1 to 3650')
+			)
+		).rejects.toThrow(/days/);
+		await expect(fetchTokens(backend, 't', reply(403, 'no'))).rejects.toBeInstanceOf(ScopeError);
 	});
 });
