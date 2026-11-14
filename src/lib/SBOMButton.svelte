@@ -27,7 +27,7 @@
 </script>
 
 <Button
-	disabled={busy}
+	{busy}
 	onclick={download}
 	title="The images it runs, as a CycloneDX software bill of materials"
 	>{busy ? 'Preparing SBOM…' : stack ? 'Download SBOM' : 'Download the fleet’s SBOM'}</Button

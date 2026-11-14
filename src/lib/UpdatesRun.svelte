@@ -36,7 +36,7 @@
 <div class="run">
 	<strong>{label}</strong>
 	<label><input type="checkbox" bind:checked={now} /> also outside the update window</label>
-	<Button disabled={job?.state === 'running'} onclick={run}
+	<Button busy={job?.state === 'running'} onclick={run}
 		>{job?.state === 'running' ? 'Running…' : 'Run updates now'}</Button
 	>
 </div>

@@ -81,7 +81,7 @@
 	<h2 id="restore-h">Restore from a backup</h2>
 	{#if !backups}
 		<p class="muted">Put the stack's volumes back from one of this host's backup archives.</p>
-		<Button disabled={loading} onclick={load}>{loading ? 'Looking…' : 'Show backups'}</Button>
+		<Button busy={loading} onclick={load}>{loading ? 'Looking…' : 'Show backups'}</Button>
 	{:else if backups.archives.length === 0}
 		<p class="muted">No archives in {backups.folder} yet.</p>
 	{:else if backups.volumes.length === 0}

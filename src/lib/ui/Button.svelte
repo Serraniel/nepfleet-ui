@@ -1,21 +1,34 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
+	import Spinner from './Spinner.svelte';
 
 	type Props = HTMLButtonAttributes & {
 		variant?: 'default' | 'primary' | 'danger' | 'ghost';
+		/** Its action is running: a spinner, and no second click meanwhile. */
+		busy?: boolean;
 		children: Snippet;
 	};
 	let {
 		variant = 'default',
 		type = 'button',
 		class: extra = '',
+		busy = false,
+		disabled,
 		children,
 		...rest
 	}: Props = $props();
 </script>
 
-<button {type} class="btn {variant} {extra}" {...rest}>{@render children()}</button>
+<button
+	{type}
+	class="btn {variant} {extra}"
+	disabled={disabled || busy}
+	aria-busy={busy || undefined}
+	{...rest}
+>
+	{#if busy}<Spinner />{/if}{@render children()}
+</button>
 
 <style>
 	.btn {
@@ -48,5 +61,10 @@
 	.btn:disabled {
 		opacity: 0.55;
 		cursor: not-allowed;
+	}
+	/* Busy isn't unavailable: it stays readable while it works. */
+	.btn[aria-busy='true'] {
+		opacity: 0.85;
+		cursor: progress;
 	}
 </style>

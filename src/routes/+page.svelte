@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onMount } from 'svelte';
 	import { backends } from '#lib/backends.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -66,7 +67,7 @@
 				<code class="muted">{backend.url}</code>
 				<p class="muted">
 					{#if !status || status.state === 'checking'}
-						Checking…
+						<Spinner label="Checking…" />
 					{:else if status.state === 'online'}
 						Online · v{status.info.version} · API {status.info.apiVersion}
 					{:else}

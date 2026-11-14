@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onMount } from 'svelte';
 	import { type Feature, fetchFeatures } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
@@ -61,7 +62,7 @@
 		<section aria-label={b.label ?? b.url}>
 			<h2>{b.label ?? new URL(b.url).host}</h2>
 			{#if !st || st.state === 'loading'}
-				<p class="muted">Loading…</p>
+				<p><Spinner label="Loading…" /></p>
 			{:else if st.state === 'error'}
 				<p class="error" role="alert">{st.error}</p>
 			{:else if st.value === null}

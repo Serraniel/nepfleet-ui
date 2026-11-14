@@ -309,8 +309,11 @@
 				</div>
 			{/if}
 			<div class="actions">
-				<Button variant="primary" onclick={create} disabled={!valid || secretsMissing || creating}
-					>{creating ? 'Creating…' : 'Create stack'}</Button
+				<Button
+					variant="primary"
+					onclick={create}
+					disabled={!valid || secretsMissing}
+					busy={creating}>{creating ? 'Creating…' : 'Create stack'}</Button
 				>
 				<span class="muted"
 					>Commits it to the fleet repository without applying it: review its plan on the next page,

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import {
@@ -128,7 +129,7 @@
 		Add one on the <a href="/stacks">Stacks</a> page.
 	</EmptyState>
 {:else if loading}
-	<p class="muted">Loading…</p>
+	<p><Spinner label="Loading…" /></p>
 {:else if loadError}
 	<p class="error" role="alert">{loadError}</p>
 {:else}
@@ -168,7 +169,7 @@
 			bind:value={message}
 			maxlength="200"
 		/>
-		<Button variant="primary" onclick={save} disabled={saving || changed.length === 0}
+		<Button variant="primary" onclick={save} busy={saving} disabled={changed.length === 0}
 			>{saving
 				? 'Saving…'
 				: changed.length

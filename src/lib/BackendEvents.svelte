@@ -48,7 +48,7 @@
 {:else}
 	<div class="row">
 		<p class="muted">From each backend you have a token for, newest first.</p>
-		<Button disabled={loading} onclick={load}>Refresh</Button>
+		<Button busy={loading} onclick={load}>Refresh</Button>
 	</div>
 	{#each errors as e (e)}<p class="error" role="alert">{e}</p>{/each}
 	{#if rows.length === 0 && !loading}

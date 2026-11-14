@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import { page } from '$app/state';
 	import {
@@ -362,8 +363,7 @@
 	<section aria-labelledby="plan-h">
 		<div class="row">
 			<h2 id="plan-h">{takingUpdates ? 'Pending changes, taking updates' : 'Pending changes'}</h2>
-			<Button variant="ghost" onclick={loadPlan} disabled={plan.state === 'loading'}>Refresh</Button
-			>
+			<Button variant="ghost" onclick={loadPlan} busy={plan.state === 'loading'}>Refresh</Button>
 		</div>
 		{#if takingUpdates}
 			<p class="muted">
@@ -462,7 +462,7 @@
 	<section aria-labelledby="upd-h">
 		<div class="row">
 			<h2 id="upd-h">Image updates</h2>
-			<Button variant="ghost" onclick={loadUpdates} disabled={updates?.state === 'loading'}
+			<Button variant="ghost" onclick={loadUpdates} busy={updates?.state === 'loading'}
 				>{updates ? 'Check again' : 'Check for updates'}</Button
 			>
 		</div>
@@ -502,7 +502,7 @@
 		<section aria-labelledby="egress-h">
 			<div class="row">
 				<h2 id="egress-h">Outbound traffic</h2>
-				<Button variant="ghost" onclick={loadEgress} disabled={egress?.state === 'loading'}
+				<Button variant="ghost" onclick={loadEgress} busy={egress?.state === 'loading'}
 					>{egress
 						? 'Check again'
 						: planValue.egress === 'enforce'
@@ -553,7 +553,8 @@
 					> in its stack.yaml, in a commit in your name.
 				</p>
 				<Button
-					disabled={egressSaving || !Object.values(egressPicked).some(Boolean)}
+					busy={egressSaving}
+					disabled={!Object.values(egressPicked).some(Boolean)}
 					onclick={allowPicked}>Allow selected</Button
 				>
 				{#if egressNote}<p role="status">{egressNote}</p>{/if}
@@ -567,12 +568,12 @@
 	<section aria-labelledby="hist-h">
 		<div class="row">
 			<h2 id="hist-h">History</h2>
-			<Button variant="ghost" onclick={loadHistory} disabled={history.state === 'loading'}
+			<Button variant="ghost" onclick={loadHistory} busy={history.state === 'loading'}
 				>Refresh</Button
 			>
 		</div>
 		{#if history.state === 'loading'}
-			<p class="muted">Loading…</p>
+			<p><Spinner label="Loading…" /></p>
 		{:else if history.state === 'error'}
 			<p class="error" role="alert">{history.error}</p>
 		{:else if history.value.length === 0}

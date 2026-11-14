@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import { type Backend, type MirrorStatus, fetchMirrors, mirrorNow } from '#lib/backend.ts';
 	import Button from '#lib/ui/Button.svelte';
 
@@ -36,7 +37,7 @@
 
 <h3>Repository mirrors</h3>
 {#if mirrors === undefined && !error}
-	<p class="muted">Loading…</p>
+	<p><Spinner label="Loading…" /></p>
 {:else if mirrors === null}
 	<p class="muted">This backend's NepFleet is too old to show its mirrors.</p>
 {:else if mirrors && mirrors.length === 0}
@@ -54,7 +55,7 @@
 			</li>
 		{/each}
 	</ul>
-	<Button disabled={busy} onclick={push}>{busy ? 'Pushing…' : 'Mirror now'}</Button>
+	<Button {busy} onclick={push}>{busy ? 'Pushing…' : 'Mirror now'}</Button>
 {/if}
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 

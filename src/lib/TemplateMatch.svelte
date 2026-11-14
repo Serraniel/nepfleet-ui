@@ -63,7 +63,7 @@
 		{/if}
 	{:else}
 		<p class="muted">Is there a catalogue template for what this stack runs?</p>
-		<Button disabled={busy} onclick={find}>{busy ? 'Looking…' : 'Find a matching template'}</Button>
+		<Button {busy} onclick={find}>{busy ? 'Looking…' : 'Find a matching template'}</Button>
 	{/if}
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
 </section>
