@@ -152,6 +152,45 @@ export async function addRemote(
 }
 
 /** Runs refresh, connect or disconnect on a remote. */
+/** One of nepfleet doctor's checks on a machine. */
+export interface DoctorCheck {
+	name: string;
+	status: 'ok' | 'warn' | 'fail';
+	detail?: string;
+	fix?: string;
+}
+
+function isDoctorCheck(v: unknown): v is DoctorCheck {
+	if (typeof v !== 'object' || v === null) return false;
+	const c = v as Record<string, unknown>;
+	return (
+		typeof c.name === 'string' &&
+		(c.status === 'ok' || c.status === 'warn' || c.status === 'fail') &&
+		(c.detail === undefined || typeof c.detail === 'string') &&
+		(c.fix === undefined || typeof c.fix === 'string')
+	);
+}
+
+/** Runs nepfleet doctor on a machine over SSH; works when its API doesn't. */
+export async function runDoctor(
+	daemon: string,
+	token: string,
+	name: string,
+	fetcher: typeof fetch = fetch
+): Promise<DoctorCheck[]> {
+	const data = await call(
+		daemon,
+		token,
+		'POST',
+		`/v1/remotes/${encodeURIComponent(name)}/doctor`,
+		undefined,
+		fetcher,
+		150000
+	);
+	if (!Array.isArray(data) || !data.every(isDoctorCheck)) throw new Error('Unexpected response');
+	return data;
+}
+
 export async function remoteAction(
 	daemon: string,
 	token: string,
