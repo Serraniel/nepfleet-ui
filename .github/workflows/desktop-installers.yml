@@ -85,7 +85,16 @@ jobs:
       - name: Build the installers
         env:
           BUNDLES: ${{ matrix.bundles }}
-        run: npx tauri build --bundles "$BUNDLES" --config '{"bundle":{"externalBin":["binaries/nepfleet"]}}'
+        shell: bash
+        # macOS's hdiutil now and then can't eject the dmg it built ("Resource
+        # busy"). Another try only bundles again: the build is cached.
+        run: |
+          for try in 1 2 3; do
+            npx tauri build --bundles "$BUNDLES" --config '{"bundle":{"externalBin":["binaries/nepfleet"]}}' && exit 0
+            echo "::warning::bundling failed (try $try of 3); trying again"
+            sleep 20
+          done
+          exit 1
       - name: Collect them
         run: |
           mkdir -p out
