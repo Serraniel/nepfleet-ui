@@ -12,6 +12,7 @@
 	import { local } from '#lib/local.svelte.ts';
 	import { verifyIdentity } from '#lib/login.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
+	import People from '#lib/People.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import TextField from '#lib/ui/TextField.svelte';
@@ -136,8 +137,8 @@
 <header>
 	<h1>Access</h1>
 	<p>
-		API tokens for tools and scripts, per backend: what each may do, on which stacks, until when.
-		Managing them needs an admin token or a sign-in, and a passkey confirmation.
+		Who may sign in, and API tokens for tools and scripts, per backend: what each may do, on which
+		stacks, until when. Managing them needs an admin token or a sign-in, and a passkey confirmation.
 	</p>
 </header>
 
@@ -230,6 +231,7 @@
 					</tbody>
 				</table>
 			{/if}
+			{#if tokens.byBackend[b.id]}<People backend={b} token={tokens.byBackend[b.id] ?? ''} />{/if}
 		</section>
 	{/each}
 {/if}

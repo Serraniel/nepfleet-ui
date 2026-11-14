@@ -1181,3 +1181,77 @@ export async function fetchDoctor(
 		throw e;
 	}
 }
+
+/** A person who signs in to a backend, and their passkeys. */
+export interface UserInfo {
+	name: string;
+	created: string;
+	external?: boolean;
+	codes: boolean;
+	passkeys: { id: string; name: string; synced: boolean; uses: number; locked?: boolean }[];
+}
+
+function isUsers(v: unknown): v is UserInfo[] {
+	return (
+		Array.isArray(v) &&
+		v.every((u) => {
+			if (typeof u !== 'object' || u === null) return false;
+			const o = u as Record<string, unknown>;
+			return (
+				typeof o.name === 'string' &&
+				Array.isArray(o.passkeys) &&
+				o.passkeys.every(
+					(p) =>
+						typeof p === 'object' &&
+						p !== null &&
+						typeof (p as Record<string, unknown>).id === 'string'
+				)
+			);
+		})
+	);
+}
+
+/** The people of a backend (admin scope); null when it has no accounts or is older. */
+export async function fetchUsers(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<UserInfo[] | null> {
+	try {
+		return await apiGet(backend, token, '/api/v1/users', isUsers, fetcher, timeoutMs);
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		if (e instanceof Error && e.message === 'HTTP 503') return null;
+		throw e;
+	}
+}
+
+/** Removes a person (passkey null) or one of their passkeys, by its whole ID. */
+export async function removeAccess(
+	backend: Backend,
+	token: string,
+	user: string,
+	passkey: string | null,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<void> {
+	const path =
+		`/api/v1/users/${encodeURIComponent(user)}` +
+		(passkey === null ? '' : `/passkeys/${encodeURIComponent(passkey)}`);
+	const res = await fetcher(`${backend.url}${path}`, {
+		method: 'DELETE',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/json', ...authInit(token).headers }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Managing people needs an admin token, or signing in.');
+	}
+	if (res.status === 404) throw new NotFoundError('No such person');
+	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+}

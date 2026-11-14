@@ -35,7 +35,9 @@ import {
 	fetchTokens,
 	createToken,
 	revokeToken,
-	fetchDoctor
+	fetchDoctor,
+	fetchUsers,
+	removeAccess
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -674,5 +676,39 @@ describe('fetchDoctor', () => {
 				JSON.stringify({ host: 'nas', checks: [{ name: 'x', status: 'bad' }], security: [] })
 			)) as unknown as typeof fetch;
 		await expect(fetchDoctor(backend, 't', odd)).rejects.toThrow(/Unexpected/);
+	});
+});
+
+describe('people', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('lists people, removes a passkey or a person, and names refusals', async () => {
+		const list = (async () =>
+			new Response(
+				JSON.stringify([
+					{
+						name: 'Ada',
+						created: '2026-01-01T00:00:00Z',
+						codes: false,
+						passkeys: [{ id: 'abc_def', name: 'abc_def', synced: true, uses: 3 }]
+					}
+				])
+			)) as unknown as typeof fetch;
+		expect((await fetchUsers(backend, 't', list))?.[0]?.passkeys[0]?.id).toBe('abc_def');
+		const none = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
+		expect(await fetchUsers(backend, 't', none)).toBeNull();
+		const urls: string[] = [];
+		const ok = (async (u: string) => {
+			urls.push(u);
+			return new Response(null, { status: 204 });
+		}) as unknown as typeof fetch;
+		await removeAccess(backend, 't', 'Ada Lovelace', 'abc_def', ok);
+		await removeAccess(backend, 't', 'Ada Lovelace', null, ok);
+		expect(urls).toEqual([
+			'https://fleet.example.org/api/v1/users/Ada%20Lovelace/passkeys/abc_def',
+			'https://fleet.example.org/api/v1/users/Ada%20Lovelace'
+		]);
+		const last = (async () =>
+			new Response("it's the last way Ada signs in", { status: 409 })) as unknown as typeof fetch;
+		await expect(removeAccess(backend, 't', 'Ada', 'abc', last)).rejects.toThrow(/last way/);
 	});
 });
