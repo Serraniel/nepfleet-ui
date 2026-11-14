@@ -958,3 +958,55 @@ export async function fetchFeatures(
 		throw e;
 	}
 }
+
+/** The notification channels of a backend's fleet.yaml, by name; null on an older backend. */
+export async function fetchChannels(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<string[] | null> {
+	try {
+		const o = await apiGet(
+			backend,
+			token,
+			'/api/v1/notifications/channels',
+			(v: unknown): v is { channels: string[] } =>
+				typeof v === 'object' &&
+				v !== null &&
+				Array.isArray((v as Record<string, unknown>).channels) &&
+				((v as Record<string, unknown>).channels as unknown[]).every((c) => typeof c === 'string'),
+			fetcher,
+			timeoutMs
+		);
+		return o.channels;
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}
+
+/** Sends a channel a test message (admin scope). Throws with the reason when it fails. */
+export async function testChannel(
+	backend: Backend,
+	token: string,
+	channel: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<void> {
+	const res = await fetcher(
+		`${backend.url}/api/v1/notifications/channels/${encodeURIComponent(channel)}/test`,
+		{
+			method: 'POST',
+			signal: AbortSignal.timeout(timeoutMs),
+			credentials: authInit(token).credentials,
+			headers: { Accept: 'application/json', ...authInit(token).headers }
+		}
+	);
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError('Sending a test needs an admin token, or signing in.');
+	if (res.status === 404) throw new NotFoundError('No such channel');
+	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+}
