@@ -37,7 +37,8 @@ import {
 	revokeToken,
 	fetchDoctor,
 	fetchUsers,
-	removeAccess
+	removeAccess,
+	allowEgress
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -710,5 +711,28 @@ describe('people', () => {
 		const last = (async () =>
 			new Response("it's the last way Ada signs in", { status: 409 })) as unknown as typeof fetch;
 		await expect(removeAccess(backend, 't', 'Ada', 'abc', last)).rejects.toThrow(/last way/);
+	});
+});
+
+describe('allowEgress', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('posts the entries and names refusals', async () => {
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response(JSON.stringify({ commit: 'c1', added: ['a.org'] }));
+		}) as unknown as typeof fetch;
+		expect(await allowEgress(backend, 't', 'web', ['a.org'], ok)).toEqual({
+			commit: 'c1',
+			added: ['a.org']
+		});
+		expect(JSON.parse(sent)).toEqual({ add: ['a.org'] });
+		const bad = (async () =>
+			new Response('allow: "*.a.org" is not a host name', {
+				status: 422
+			})) as unknown as typeof fetch;
+		await expect(allowEgress(backend, 't', 'web', ['*.a.org'], bad)).rejects.toBeInstanceOf(
+			InvalidEditError
+		);
 	});
 });
