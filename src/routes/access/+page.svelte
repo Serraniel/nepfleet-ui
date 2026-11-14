@@ -242,16 +242,28 @@
 {/if}
 
 <style>
+	/* Labels on one line, inputs on one line; a hint below one field moves
+	   nothing else. The button gets its own row. */
 	form {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.75rem;
-		align-items: flex-end;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+		gap: 0.75rem 1rem;
+		align-items: start;
+	}
+	form :global(button[type='submit']) {
+		grid-column: 1 / -1;
+		justify-self: start;
 	}
 	label {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: var(--space-1);
+		font-weight: 600;
+		font-size: 0.9rem;
+	}
+	label select {
+		font-weight: normal;
+		font-size: 1rem;
 	}
 	table {
 		border-collapse: collapse;

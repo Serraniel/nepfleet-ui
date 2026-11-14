@@ -144,11 +144,17 @@
 		align-items: center;
 		padding: 0.15rem 0;
 	}
+	/* Labels on one line, inputs on one line; a hint below one field moves
+	   nothing else. The button gets its own row. */
 	form {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.75rem;
-		align-items: flex-end;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+		gap: 0.75rem 1rem;
+		align-items: start;
+	}
+	form :global(button[type='submit']) {
+		grid-column: 1 / -1;
+		justify-self: start;
 	}
 	.muted {
 		color: var(--muted);

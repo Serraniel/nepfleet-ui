@@ -366,7 +366,7 @@ nepfleet control token</code
 			in your local copy of the fleet repository, and share passwords are decrypted with this computer's
 			age key. They go only to the machine, never to the NepFleet server.
 		</p>
-		<form class="row" onsubmit={saveFleetDir}>
+		<form class="stacked" onsubmit={saveFleetDir}>
 			<TextField
 				label="Folder"
 				bind:value={fleetDir}
@@ -633,6 +633,15 @@ nepfleet control token</code
 		white-space: pre-wrap;
 		word-break: break-all;
 		font-size: 0.85em;
+	}
+	.stacked {
+		display: grid;
+		gap: 0.75rem;
+		justify-items: start;
+		max-width: 40rem;
+	}
+	.stacked :global(.field) {
+		justify-self: stretch;
 	}
 	.row {
 		display: flex;
