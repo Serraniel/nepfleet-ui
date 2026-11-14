@@ -1326,3 +1326,40 @@ export function fetchRendered(
 		timeoutMs
 	);
 }
+
+/**
+ * Runs the backend's updates now, as nepfleet updates apply: a job (kind
+ * updates) to follow with fetchJob. now also ignores the update window.
+ */
+export async function startUpdates(
+	backend: Backend,
+	token: string,
+	now: boolean,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<Job> {
+	const res = await fetcher(`${backend.url}/api/v1/updates/run`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify({ now })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError(
+			'Running updates needs a token with the apply scope that is not limited to stacks.'
+		);
+	if (res.status === 404)
+		throw new NotFoundError('This backend is too old to run updates from here');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
+	const job: unknown = await res.json();
+	if (!isJob(job)) throw new Error('Unexpected response');
+	return job;
+}
