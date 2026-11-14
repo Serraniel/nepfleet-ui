@@ -10,6 +10,27 @@ export interface TemplateInput {
 	default?: string;
 	options?: string[];
 	pattern?: string;
+	/** An enum input whose current value picks the text in help. */
+	helpFrom?: string;
+	help?: Record<string, string>;
+}
+
+/**
+ * What to show under an input: the help for the current value of its
+ * helpFrom input (else that input's default), else its description. The
+ * same as nepfleet's Spec.HelpText.
+ */
+export function helpText(
+	inp: TemplateInput,
+	inputs: TemplateInput[],
+	values: Record<string, string>
+): string {
+	if (inp.helpFrom && inp.help) {
+		const v = values[inp.helpFrom] || inputs.find((i) => i.name === inp.helpFrom)?.default || '';
+		const h = Object.hasOwn(inp.help, v) ? inp.help[v] : undefined;
+		if (h !== undefined) return h;
+	}
+	return inp.description ?? '';
 }
 
 // The same rules as nepfleet's render.CheckInput, so the wizard and the

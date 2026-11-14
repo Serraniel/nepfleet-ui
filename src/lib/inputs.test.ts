@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkInput, newCommand, shellQuote } from './inputs.ts';
+import { checkInput, helpText, newCommand, shellQuote } from './inputs.ts';
 
 describe('checkInput', () => {
 	it('follows the backend rules', () => {
@@ -41,5 +41,32 @@ describe('newCommand', () => {
 	it('quotes for the shell', () => {
 		expect(shellQuote('a b')).toBe("'a b'");
 		expect(shellQuote('$(x)')).toBe("'$(x)'");
+	});
+});
+
+describe('helpText', () => {
+	const provider = {
+		name: 'PROVIDER',
+		type: 'enum',
+		options: ['none', 'cloudflare'],
+		default: 'none'
+	};
+	const token = {
+		name: 'TOKEN',
+		type: 'secret',
+		description: 'a token',
+		helpFrom: 'PROVIDER',
+		help: { cloudflare: 'Zone → DNS → Edit' }
+	};
+	const inputs = [provider, token];
+	it('shows the help for the chosen value', () => {
+		expect(helpText(token, inputs, { PROVIDER: 'cloudflare' })).toBe('Zone → DNS → Edit');
+	});
+	it('falls back to the description, also for the default value', () => {
+		expect(helpText(token, inputs, {})).toBe('a token');
+		expect(helpText(token, inputs, { PROVIDER: 'none' })).toBe('a token');
+	});
+	it("ignores keys that aren't the template's own", () => {
+		expect(helpText(token, inputs, { PROVIDER: 'toString' })).toBe('a token');
 	});
 });

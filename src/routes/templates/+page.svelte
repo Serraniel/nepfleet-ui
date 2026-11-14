@@ -11,7 +11,14 @@
 	} from '#lib/backend.ts';
 	import { verifyIdentity } from '#lib/login.ts';
 	import { backends } from '#lib/backends.svelte.ts';
-	import { STACK_NAME, TYPED, type TemplateInput, checkInput, newCommand } from '#lib/inputs.ts';
+	import {
+		STACK_NAME,
+		TYPED,
+		type TemplateInput,
+		checkInput,
+		helpText,
+		newCommand
+	} from '#lib/inputs.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -266,7 +273,7 @@
 								/>
 							{/if}
 							<span id="h-{inp.name}" class={err ? 'error' : 'muted'}>
-								{err || inp.description || ''}
+								{err || helpText(inp, inputs, values)}
 							</span>
 						</div>
 					{:else}
@@ -284,7 +291,8 @@
 								aria-describedby="h-{inp.name}"
 							/>
 							<span id="h-{inp.name}" class="muted">
-								{inp.description ? inp.description + ' ' : ''}Stored encrypted on the backend.
+								{helpText(inp, inputs, values) ? helpText(inp, inputs, values) + ' ' : ''}Stored
+								encrypted on the backend.
 							</span>
 						</div>
 					{/if}
