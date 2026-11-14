@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import {
 		type SourceCatalogue,
 		type TemplateEntry,
@@ -34,9 +35,17 @@
 
 	const withToken = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
 
+	// ?backend=<id>&template=<name> opens the wizard for an official template,
+	// as the Features page does to enable one.
+	let wanted = '';
+
 	onMount(() => {
 		void backends.checkAll();
-		if (withToken[0]) backendId = withToken[0].id;
+		const q = page.url.searchParams;
+		wanted = q.get('template') ?? '';
+		const asked = withToken.find((b) => b.id === q.get('backend'));
+		if (asked) backendId = asked.id;
+		else if (withToken[0]) backendId = withToken[0].id;
 	});
 
 	async function load() {
@@ -47,6 +56,14 @@
 		error = '';
 		try {
 			catalogues = await fetchTemplates(b, token);
+			if (wanted) {
+				const hit = catalogues
+					.filter((c) => c.source === 'official')
+					.flatMap((c) => (c.templates ?? []).map((t) => ({ source: c.source, t })))
+					.find((e) => e.t.name === wanted);
+				wanted = '';
+				if (hit) pick(hit);
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			catalogues = [];
