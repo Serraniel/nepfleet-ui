@@ -56,6 +56,9 @@ test('toasts: errors are announced as alerts and stay', async ({ page }) => {
 });
 
 test('toasts raised while a dialog is open show inside it', async ({ page }) => {
+	// An effect that loops (effect_update_depth_exceeded) shows only here.
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
 	await page.goto('/design');
 	await page.getByRole('button', { name: 'Open dialog' }).click();
 	const dialog = page.getByRole('dialog');
@@ -63,4 +66,5 @@ test('toasts raised while a dialog is open show inside it', async ({ page }) => 
 	await expect(dialog.getByRole('alert')).toContainText('image not found');
 	await dialog.getByRole('button', { name: 'Dismiss: Apply failed: image not found' }).click();
 	await expect(page.getByText('image not found')).toBeHidden();
+	expect(errors).toEqual([]);
 });
