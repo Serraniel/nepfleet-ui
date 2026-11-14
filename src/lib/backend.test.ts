@@ -45,7 +45,9 @@ import {
 	fetchMirrors,
 	mirrorNow,
 	fetchEvents,
-	fetchMatches
+	fetchMatches,
+	fetchBackups,
+	startRestore
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -869,5 +871,43 @@ describe('fetchMatches', () => {
 		const odd = (async () =>
 			new Response(JSON.stringify({ matches: [{}] }))) as unknown as typeof fetch;
 		await expect(fetchMatches(backend, 't', 'media', odd)).rejects.toThrow(/Unexpected/);
+	});
+});
+
+describe('restore', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('lists archives, starts the job, and names refusals', async () => {
+		const list = (async () =>
+			new Response(
+				JSON.stringify({
+					folder: '/srv/backups',
+					archives: ['backup-1.tar.gz.age'],
+					volumes: ['db']
+				})
+			)) as unknown as typeof fetch;
+		expect((await fetchBackups(backend, 't', 'web', list)).volumes).toEqual(['db']);
+		let sent = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			sent = String(init.body);
+			return new Response(
+				JSON.stringify({
+					id: 'j',
+					stack: 'web',
+					kind: 'restore',
+					state: 'running',
+					log: '',
+					by: 'a'
+				}),
+				{ status: 202 }
+			);
+		}) as unknown as typeof fetch;
+		const req = { archive: 'backup-1.tar.gz.age', confirm: 'web' };
+		expect((await startRestore(backend, 't', 'web', req, ok)).kind).toBe('restore');
+		expect(JSON.parse(sent)).toEqual(req);
+		const none = (async () =>
+			new Response('no volume-backup stack runs on this host', {
+				status: 422
+			})) as unknown as typeof fetch;
+		await expect(fetchBackups(backend, 't', 'web', none)).rejects.toThrow();
 	});
 });
