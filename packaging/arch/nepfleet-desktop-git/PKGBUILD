@@ -2,7 +2,7 @@
 # The NepFleet desktop app, built from git. Until it's on the AUR:
 #   cd packaging/arch/nepfleet-desktop-git && makepkg -si
 pkgname=nepfleet-desktop-git
-pkgver=0.1.0.r0.g0000000
+pkgver=0.3.1.r0.g8257309
 pkgrel=1
 pkgdesc="Desktop app for NepFleet: your fleets, through the local control daemon"
 arch=('x86_64' 'aarch64')
