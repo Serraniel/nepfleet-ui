@@ -43,7 +43,8 @@ import {
 	startUpdates,
 	backupKey,
 	fetchMirrors,
-	mirrorNow
+	mirrorNow,
+	fetchEvents
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -818,5 +819,29 @@ describe('mirrors', () => {
 		}) as unknown as typeof fetch;
 		expect((await mirrorNow(backend, 't', ok))[0]?.ok).toBeTruthy();
 		expect(method).toBe('POST');
+	});
+});
+
+describe('fetchEvents', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('walks the pages and keeps the newest', async () => {
+		const ev = (id: number) => ({
+			id,
+			time: '2026-01-01T00:00:00Z',
+			name: 'container.oom',
+			severity: 'error',
+			title: `e${id}`
+		});
+		const urls: string[] = [];
+		const paged = (async (u: string) => {
+			urls.push(u);
+			const after = Number(new URL(u).searchParams.get('after'));
+			const n = after === 0 ? 500 : 3;
+			return new Response(JSON.stringify(Array.from({ length: n }, (_, i) => ev(after + i + 1))));
+		}) as unknown as typeof fetch;
+		const got = await fetchEvents(backend, 't', 10, paged);
+		expect(got.length).toBe(10);
+		expect(got.at(-1)?.id).toBe(503);
+		expect(urls[1]).toContain('after=500');
 	});
 });
