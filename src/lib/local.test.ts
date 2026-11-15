@@ -391,6 +391,12 @@ group('updateOffer', () => {
 			updateOffer({ nepfleetImage: 'ghcr.io/serraniel/nepfleet:v0.3.1@sha256:abc' }, 'v0.3.4')
 		).toBe('0.3.4');
 	});
+	it('offers edge from a daemon built from main, wherever a NepFleet container runs', () => {
+		expect(updateOffer(at('0.4.0'), 'edge')).toBe('edge');
+		expect(updateOffer(at('edge@sha256:abc'), 'edge')).toBe('edge');
+		expect(updateOffer({ nepfleetRunning: true }, 'edge')).toBeNull();
+		expect(updateOffer(undefined, 'edge')).toBeNull();
+	});
 	it('offers nothing otherwise', () => {
 		expect(updateOffer(at('0.4.0'), 'v0.4.0')).toBeNull();
 		expect(updateOffer(at('0.5.0'), 'v0.4.0')).toBeNull();

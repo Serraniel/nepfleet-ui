@@ -519,7 +519,9 @@ nepfleet control token</code
 								variant="primary"
 								onclick={() => openSetup(r, 'update')}
 								disabled={!!busy[r.name]}
-								title="This machine runs an older NepFleet than this app"
+								title={local.version === 'edge'
+									? 'Updates it to the newest build of main (the signed :edge image), to test before a release'
+									: 'This machine runs an older NepFleet than this app'}
 								>Update NepFleet to {updateOffer(r.report, local.version)}…</Button
 							>
 						{/if}
