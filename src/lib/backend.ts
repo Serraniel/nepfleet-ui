@@ -680,11 +680,11 @@ export interface Job {
 	error?: string;
 	log: string;
 	by: string;
-	/** The phase a running apply is in: step of steps, counted from the start. */
+	/** The step a running job is in: step of steps, counted from the start. */
 	progress?: { step: number; steps: number; text: string };
 }
 
-function isProgress(v: unknown): v is Job['progress'] {
+export function isProgress(v: unknown): v is Job['progress'] {
 	if (typeof v !== 'object' || v === null) return false;
 	const p = v as Record<string, unknown>;
 	return (

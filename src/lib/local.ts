@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AuthError, ConflictError, NotFoundError, normalizeUrl } from './backend.ts';
+import { AuthError, ConflictError, NotFoundError, isProgress, normalizeUrl } from './backend.ts';
 import type { FleetEvent } from './notifications.ts';
 
 /** What a probe found on a machine (nepfleet remote probe). */
@@ -292,6 +292,8 @@ export interface SetupJob {
 	state: 'running' | 'succeeded' | 'failed';
 	log: string;
 	error?: string;
+	/** The step a running setup is in (daemons from 0.4 on). */
+	progress?: { step: number; steps: number; text: string };
 }
 
 /** What the machine needs next, from its last check: undefined when NepFleet is there. */
@@ -315,6 +317,9 @@ function isSetupPlan(v: unknown): v is SetupPlan {
 
 function isSetupJob(v: unknown): v is SetupJob {
 	const o = v as Partial<SetupJob> | null;
+	// A malformed progress is dropped, not the job: the bar is extra.
+	if (o && typeof o === 'object' && o.progress !== undefined && !isProgress(o.progress))
+		delete o.progress;
 	return (
 		typeof o === 'object' &&
 		o !== null &&
