@@ -315,6 +315,7 @@
 		update: 'Update NepFleet',
 		start: 'Start NepFleet',
 		repair: 'Repair NepFleet',
+		'host-update': 'Update the host',
 		mounts: 'Network mounts'
 	};
 	const setupTitle = (p: SetupPlan | null) => setupTitles[p?.kind ?? setupAsked ?? 'bootstrap'];
@@ -554,6 +555,16 @@ nepfleet control token</code
 								<p class="error" role="alert">Host updates: {u.error}</p>
 							{:else if u.value}
 								<p role="status">{describeHostUpdates(u.value)}</p>
+								{#if u.value.supported && u.value.pending > 0}
+									<p>
+										<Button
+											onclick={() => openSetup(r, 'host-update')}
+											disabled={!!busy[r.name]}
+											title="Plans the update for you to review; nothing runs until you start it"
+											>Update the host…</Button
+										>
+									</p>
+								{/if}
 								{#if u.value.packages?.length}
 									<details>
 										<summary>Packages</summary>
@@ -667,6 +678,19 @@ nepfleet control token</code
 		<p>Then connect, to manage its stacks from here.</p>
 	{:else if setupPlan}
 		{#if setupPlan.error}<p class="error" role="alert">{setupPlan.error}</p>{/if}
+		{#if setupPlan.kind === 'host-update' && setupFor && hostUpdates[setupFor.name]?.value?.news?.length}
+			<div class="news" role="alert">
+				<strong>Read the Arch news since this machine's last update first:</strong>
+				<ul>
+					{#each hostUpdates[setupFor.name]!.value!.news! as n, i (i)}
+						<li>
+							{#if n.link}<a href={n.link} target="_blank" rel="noopener noreferrer">{n.title}</a
+								>{:else}{n.title}{/if}
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		{#if setupPlan.steps.length}
 			<p>{setupPlan.error ? 'It would need:' : 'This runs on the machine, in order:'}</p>
 			<ol>
@@ -768,11 +792,12 @@ nepfleet control token</code
 	.host-updates p {
 		margin: 0.25rem 0;
 	}
-	.host-updates .news {
+	.host-updates .news,
+	.news {
 		padding-left: 0.6rem;
 		border-left: 3px solid var(--warn);
 	}
-	.host-updates .news ul {
+	.news ul {
 		margin: 0.25rem 0 0;
 		padding-left: 1.1rem;
 	}
