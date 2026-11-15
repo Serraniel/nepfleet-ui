@@ -324,7 +324,15 @@ export async function removeRemote(
  * Preparing a machine, installing NepFleet, updating it to the daemon's
  * version, or its network mounts (host apply).
  */
-export const SETUP_KINDS = ['bootstrap', 'install', 'update', 'start', 'repair', 'mounts'] as const;
+export const SETUP_KINDS = [
+	'bootstrap',
+	'install',
+	'update',
+	'start',
+	'repair',
+	'host-update',
+	'mounts'
+] as const;
 export type SetupKind = (typeof SETUP_KINDS)[number];
 
 const RELEASE = /^v?(\d+)\.(\d+)\.(\d+)$/;
