@@ -16,6 +16,7 @@ import {
 	fetchSetupJob,
 	fetchSetupPlan,
 	removeRemote,
+	SETUP_KINDS,
 	setupKind,
 	startSetup,
 	saveSettings,
@@ -127,6 +128,14 @@ group('setting a machine up', () => {
 			})
 		).toBeUndefined();
 		expect(setupKind({ kernel: 'Darwin' })).toBeUndefined();
+	});
+	it('accepts a plan of every setup kind', async () => {
+		for (const kind of SETUP_KINDS) {
+			const plan = fake(200, { kind, steps: [{ text: 'a step', root: false }], id: 'p' });
+			expect((await fetchSetupPlan(daemon, 't', 'vps', kind, plan.fetcher)).kind).toBe(kind);
+		}
+		const odd = fake(200, { kind: 'format-disk', steps: [], id: 'p' });
+		await expect(fetchSetupPlan(daemon, 't', 'vps', 'install', odd.fetcher)).rejects.toThrow();
 	});
 	it('plans, starts the reviewed plan and follows the job', async () => {
 		const plan = fake(200, {

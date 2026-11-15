@@ -535,7 +535,7 @@ nepfleet control token</code
 										: `${problems.length} of ${d.checks.length} checks need attention.`}
 								</p>
 								<ul>
-									{#each problems as c (c.name)}
+									{#each problems as c, i (i)}
 										<li class={c.status}>
 											<strong>{c.status === 'fail' ? '✗' : '⚠'} {c.name}</strong>
 											{#if c.detail}<span>{c.detail}</span>{/if}
