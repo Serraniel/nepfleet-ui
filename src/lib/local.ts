@@ -160,19 +160,22 @@ export interface DoctorCheck {
 	status: 'ok' | 'warn' | 'fail';
 	detail?: string;
 	fix?: string;
-	/** A setup kind that applies the fix as a reviewed plan (start). */
-	action?: 'start';
+	/** A setup kind that applies the fix as a reviewed plan. */
+	action?: 'start' | 'repair';
 }
+
+const DOCTOR_ACTIONS: readonly unknown[] = ['start', 'repair'];
 
 function isDoctorCheck(v: unknown): v is DoctorCheck {
 	if (typeof v !== 'object' || v === null) return false;
 	const c = v as Record<string, unknown>;
+	// An action this app doesn't know (a newer daemon) is dropped, not the check.
+	if (c.action !== undefined && !DOCTOR_ACTIONS.includes(c.action)) delete c.action;
 	return (
 		typeof c.name === 'string' &&
 		(c.status === 'ok' || c.status === 'warn' || c.status === 'fail') &&
 		(c.detail === undefined || typeof c.detail === 'string') &&
-		(c.fix === undefined || typeof c.fix === 'string') &&
-		(c.action === undefined || c.action === 'start')
+		(c.fix === undefined || typeof c.fix === 'string')
 	);
 }
 
@@ -235,7 +238,7 @@ export async function removeRemote(
  * Preparing a machine, installing NepFleet, updating it to the daemon's
  * version, or its network mounts (host apply).
  */
-export const SETUP_KINDS = ['bootstrap', 'install', 'update', 'start', 'mounts'] as const;
+export const SETUP_KINDS = ['bootstrap', 'install', 'update', 'start', 'repair', 'mounts'] as const;
 export type SetupKind = (typeof SETUP_KINDS)[number];
 
 const RELEASE = /^v?(\d+)\.(\d+)\.(\d+)$/;
