@@ -299,17 +299,24 @@ group('runDoctor', () => {
 		);
 	});
 	it('refuses odd answers', async () => {
-		for (const body of [
-			{},
-			[{ name: 'x', status: 'great' }],
-			[{ status: 'ok' }],
-			[{ name: 'x', status: 'fail', action: 'rm -rf' }],
-			'checks'
-		]) {
+		for (const body of [{}, [{ name: 'x', status: 'great' }], [{ status: 'ok' }], 'checks']) {
 			await expect(
 				runDoctor('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(body))
 			).rejects.toThrow('Unexpected response');
 		}
+	});
+	it('keeps known actions and drops others, not the check', async () => {
+		const got = await runDoctor(
+			'http://127.0.0.1:7481',
+			'nfc_x',
+			'vps',
+			answering([
+				{ name: 'age key', status: 'fail', action: 'repair' },
+				{ name: 'NepFleet', status: 'fail', action: 'start' },
+				{ name: 'x', status: 'fail', action: 'rm -rf' }
+			])
+		);
+		expect(got.map((c) => c.action)).toEqual(['repair', 'start', undefined]);
 	});
 });
 

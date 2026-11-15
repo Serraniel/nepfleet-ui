@@ -292,16 +292,15 @@
 
 	const setupRunning = $derived(setupJob?.state === 'running');
 	const needsPassword = $derived(!!setupPlan?.sudoPassword && !setupRunning);
-	const setupTitle = (p: SetupPlan | null) =>
-		(p?.kind ?? setupAsked) === 'install'
-			? 'Install NepFleet'
-			: (p?.kind ?? setupAsked) === 'update'
-				? 'Update NepFleet'
-				: (p?.kind ?? setupAsked) === 'start'
-					? 'Start NepFleet'
-					: (p?.kind ?? setupAsked) === 'mounts'
-						? 'Network mounts'
-						: 'Prepare the machine';
+	const setupTitles: Record<SetupKind, string> = {
+		bootstrap: 'Prepare the machine',
+		install: 'Install NepFleet',
+		update: 'Update NepFleet',
+		start: 'Start NepFleet',
+		repair: 'Repair NepFleet',
+		mounts: 'Network mounts'
+	};
+	const setupTitle = (p: SetupPlan | null) => setupTitles[p?.kind ?? setupAsked ?? 'bootstrap'];
 
 	// The local fleet repository folder: mounts are planned from its hosts/.
 	let fleetDir = $state('');
@@ -540,10 +539,11 @@ nepfleet control token</code
 											<strong>{c.status === 'fail' ? '✗' : '⚠'} {c.name}</strong>
 											{#if c.detail}<span>{c.detail}</span>{/if}
 											{#if c.fix}<span class="fix">Fix: <code>{c.fix}</code></span>{/if}
-											{#if c.action === 'start'}
+											{#if c.action}
+												{@const kind = c.action}
 												<span
-													><Button onclick={() => openSetup(r, 'start')} disabled={!!busy[r.name]}
-														>Start NepFleet…</Button
+													><Button onclick={() => openSetup(r, kind)} disabled={!!busy[r.name]}
+														>{setupTitles[kind]}…</Button
 													></span
 												>
 											{/if}
