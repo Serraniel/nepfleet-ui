@@ -2,6 +2,8 @@
 	import { onDestroy } from 'svelte';
 	import { type Backend, type Job, fetchJob, startUpdates } from '#lib/backend.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import ProgressBar from '#lib/ui/ProgressBar.svelte';
+	import Spinner from '#lib/ui/Spinner.svelte';
 
 	type Props = { backend: Backend; token: string; label: string };
 	let { backend, token, label }: Props = $props();
@@ -42,13 +44,16 @@
 </div>
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 {#if job}
-	<p role="status" class:error={job.state === 'failed'}>
-		{job.state === 'running'
-			? 'Running…'
-			: job.state === 'succeeded'
-				? 'Done.'
-				: `Failed: ${job.error ?? 'see the log'}`}
-	</p>
+	{#if job.state === 'running' && job.progress}
+		<ProgressBar {...job.progress} />
+	{:else}
+		<p role="status" class:error={job.state === 'failed'}>
+			{#if job.state === 'running'}<Spinner
+					label="Running…"
+				/>{:else if job.state === 'succeeded'}Done.{:else}Failed:
+				{job.error ?? 'see the log'}{/if}
+		</p>
+	{/if}
 	{#if job.log}<pre>{job.log}</pre>{/if}
 {/if}
 
