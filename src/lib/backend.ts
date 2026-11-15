@@ -747,6 +747,8 @@ export interface SourceCatalogue {
 	commit?: string;
 	templates: TemplateEntry[] | null;
 	invalid?: string[];
+	/** Templates that stacks on the backend's host use; absent from older servers. */
+	installed?: string[];
 }
 
 function isCatalogues(v: unknown): v is SourceCatalogue[] {
@@ -755,6 +757,12 @@ function isCatalogues(v: unknown): v is SourceCatalogue[] {
 		v.every((s) => {
 			if (typeof s !== 'object' || s === null) return false;
 			const o = s as Record<string, unknown>;
+			// The installed list is extra: malformed, it is dropped.
+			if (
+				o.installed !== undefined &&
+				!(Array.isArray(o.installed) && o.installed.every((n) => typeof n === 'string'))
+			)
+				delete o.installed;
 			return (
 				typeof o.source === 'string' &&
 				(o.templates === null ||
