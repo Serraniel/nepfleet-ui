@@ -235,7 +235,8 @@ export async function removeRemote(
  * Preparing a machine, installing NepFleet, updating it to the daemon's
  * version, or its network mounts (host apply).
  */
-export type SetupKind = 'bootstrap' | 'install' | 'update' | 'start' | 'mounts';
+export const SETUP_KINDS = ['bootstrap', 'install', 'update', 'start', 'mounts'] as const;
+export type SetupKind = (typeof SETUP_KINDS)[number];
 
 const RELEASE = /^v?(\d+)\.(\d+)\.(\d+)$/;
 const IMAGE_TAG = /:v?(\d+\.\d+\.\d+)(@|$)/;
@@ -309,7 +310,7 @@ function isSetupPlan(v: unknown): v is SetupPlan {
 	return (
 		typeof o === 'object' &&
 		o !== null &&
-		(o.kind === 'bootstrap' || o.kind === 'install' || o.kind === 'mounts') &&
+		(SETUP_KINDS as readonly unknown[]).includes(o.kind) &&
 		Array.isArray(o.steps) &&
 		o.steps.every((s) => typeof s?.text === 'string' && typeof s.root === 'boolean')
 	);
