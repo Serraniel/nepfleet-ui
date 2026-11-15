@@ -23,6 +23,9 @@
 		saveSettings,
 		runDoctor,
 		type DoctorCheck,
+		checkHostUpdates,
+		describeHostUpdates,
+		type HostUpdates,
 		updateOffer
 	} from '#lib/local.ts';
 	import TextField from '#lib/ui/TextField.svelte';
@@ -180,6 +183,20 @@
 			doctor[r.name] = { checks: checks.toSorted((a, b) => rank[a.status] - rank[b.status]) };
 		} catch (e) {
 			doctor[r.name] = { error: e instanceof Error ? e.message : String(e) };
+		} finally {
+			delete busy[r.name];
+		}
+	}
+
+	/** Per machine: its package manager's last answer. */
+	let hostUpdates = $state<Record<string, { value?: HostUpdates; error?: string }>>({});
+
+	async function checkUpdates(r: Remote) {
+		busy[r.name] = 'updates';
+		try {
+			hostUpdates[r.name] = { value: await checkHostUpdates(local.url, local.token, r.name) };
+		} catch (e) {
+			hostUpdates[r.name] = { error: e instanceof Error ? e.message : String(e) };
 		} finally {
 			delete busy[r.name];
 		}
@@ -511,6 +528,15 @@ nepfleet control token</code
 								title="Runs nepfleet doctor on the machine over SSH">Check NepFleet</Button
 							>
 						{/if}
+						{#if r.report?.kernel === 'Linux'}
+							<Button
+								onclick={() => checkUpdates(r)}
+								disabled={!!busy[r.name]}
+								busy={busy[r.name] === 'updates'}
+								title="Asks the machine's package manager over SSH what it has pending; installs nothing"
+								>Check host updates</Button
+							>
+						{/if}
 						<Button
 							variant="ghost"
 							onclick={() => {
@@ -521,6 +547,27 @@ nepfleet control token</code
 							busy={busy[r.name] === 'remove'}>Remove…</Button
 						>
 					</div>
+					{#if hostUpdates[r.name]}
+						{@const u = hostUpdates[r.name]!}
+						<div class="host-updates" aria-label="Pending host updates on {r.name}">
+							{#if u.error}
+								<p class="error" role="alert">Host updates: {u.error}</p>
+							{:else if u.value}
+								<p role="status">{describeHostUpdates(u.value)}</p>
+								{#if u.value.packages?.length}
+									<details>
+										<summary>Packages</summary>
+										<p class="packages">
+											{u.value.packages.join(', ')}{u.value.pending > u.value.packages.length
+												? ` and ${u.value.pending - u.value.packages.length} more`
+												: ''}
+										</p>
+									</details>
+								{/if}
+								{#each u.value.notes ?? [] as note, i (i)}<p class="muted">{note}</p>{/each}
+							{/if}
+						</div>
+					{/if}
 					{#if doctor[r.name]}
 						{@const d = doctor[r.name]!}
 						<div class="doctor" aria-label="NepFleet checks on {r.name}">
@@ -702,6 +749,14 @@ nepfleet control token</code
 	}
 	.doctor .fix code {
 		overflow-wrap: anywhere;
+	}
+	.host-updates p {
+		margin: 0.25rem 0;
+	}
+	.host-updates .packages {
+		overflow-wrap: anywhere;
+		font-family: var(--mono, monospace);
+		font-size: 0.85rem;
 	}
 	header p,
 	.muted {

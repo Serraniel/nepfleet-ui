@@ -21,6 +21,8 @@ import {
 	startSetup,
 	saveSettings,
 	runDoctor,
+	checkHostUpdates,
+	describeHostUpdates,
 	updateOffer
 } from './local.ts';
 
@@ -283,6 +285,44 @@ group('daemon settings and mounts', () => {
 		const plan = await fetchSetupPlan('http://127.0.0.1:1', 't', 'vps', 'mounts', fake);
 		expect(plan.kind).toBe('mounts');
 		expect(calls[1]?.url).toContain('kind=mounts');
+	});
+});
+
+group('checkHostUpdates', () => {
+	const answering = (body: unknown) =>
+		(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch;
+	const arch = {
+		os: 'arch',
+		supported: true,
+		pending: 2,
+		security: 1,
+		rebootRequired: true,
+		packages: ['linux', 'openssl']
+	};
+	it('returns and describes the answer', async () => {
+		const h = await checkHostUpdates('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(arch));
+		expect(h).toEqual(arch);
+		expect(describeHostUpdates(h)).toBe('2 updates (1 security fix), reboot required.');
+		expect(describeHostUpdates({ ...arch, pending: 0, security: -1, rebootRequired: null })).toBe(
+			'Up to date.'
+		);
+		expect(describeHostUpdates({ ...arch, pending: 1, security: 0, rebootRequired: false })).toBe(
+			'1 update, no security fixes.'
+		);
+		expect(describeHostUpdates({ ...arch, os: 'gentoo', supported: false })).toContain('gentoo');
+	});
+	it('refuses odd answers', async () => {
+		for (const body of [
+			{},
+			{ ...arch, pending: -3 },
+			{ ...arch, security: -2 },
+			{ ...arch, rebootRequired: 'maybe' },
+			{ ...arch, packages: [1] }
+		]) {
+			await expect(
+				checkHostUpdates('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(body))
+			).rejects.toThrow('Unexpected response');
+		}
 	});
 });
 

@@ -199,6 +199,74 @@ export async function runDoctor(
 	return data;
 }
 
+/** What a machine's package manager has pending (nothing is installed). */
+export interface HostUpdates {
+	os: string;
+	supported: boolean;
+	pending: number;
+	/** Security fixes among them; -1 when the machine can't tell. */
+	security: number;
+	/** null when the machine can't tell. */
+	rebootRequired: boolean | null;
+	packages?: string[];
+	notes?: string[];
+}
+
+function isHostUpdates(v: unknown): v is HostUpdates {
+	if (typeof v !== 'object' || v === null) return false;
+	const h = v as Record<string, unknown>;
+	const strings = (x: unknown) =>
+		x === undefined || x === null || (Array.isArray(x) && x.every((s) => typeof s === 'string'));
+	return (
+		typeof h.os === 'string' &&
+		typeof h.supported === 'boolean' &&
+		Number.isInteger(h.pending) &&
+		(h.pending as number) >= 0 &&
+		Number.isInteger(h.security) &&
+		(h.security as number) >= -1 &&
+		(h.rebootRequired === null || typeof h.rebootRequired === 'boolean') &&
+		strings(h.packages) &&
+		strings(h.notes)
+	);
+}
+
+/** Asks a machine's package manager over SSH what it has pending. */
+export async function checkHostUpdates(
+	daemon: string,
+	token: string,
+	name: string,
+	fetcher: typeof fetch = fetch
+): Promise<HostUpdates> {
+	const data = await call(
+		daemon,
+		token,
+		'POST',
+		`/v1/remotes/${encodeURIComponent(name)}/host-updates`,
+		undefined,
+		fetcher,
+		200000
+	);
+	if (!isHostUpdates(data)) throw new Error('Unexpected response');
+	return data;
+}
+
+/** One line for a machine's pending updates. */
+export function describeHostUpdates(h: HostUpdates): string {
+	if (!h.supported) return `NepFleet doesn't know how to check updates on ${h.os} yet.`;
+	const parts = [
+		h.pending === 0
+			? 'Up to date'
+			: `${h.pending} update${h.pending === 1 ? '' : 's'}` +
+				(h.security > 0
+					? ` (${h.security} security fix${h.security === 1 ? '' : 'es'})`
+					: h.security === 0
+						? ', no security fixes'
+						: '')
+	];
+	if (h.rebootRequired === true) parts.push('reboot required');
+	return parts.join(', ') + '.';
+}
+
 export async function remoteAction(
 	daemon: string,
 	token: string,
