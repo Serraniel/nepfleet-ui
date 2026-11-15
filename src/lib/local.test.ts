@@ -145,6 +145,26 @@ group('setting a machine up', () => {
 		});
 		const job = fake(200, { kind: 'install', state: 'succeeded', log: '1/1 pull the image\n' });
 		expect((await fetchSetupJob(daemon, 't', 'vps', job.fetcher)).state).toBe('succeeded');
+		const running = fake(200, {
+			kind: 'install',
+			state: 'running',
+			log: '1/2 pull the image\n',
+			progress: { step: 1, steps: 2, text: 'pull the image' }
+		});
+		expect((await fetchSetupJob(daemon, 't', 'vps', running.fetcher)).progress).toEqual({
+			step: 1,
+			steps: 2,
+			text: 'pull the image'
+		});
+		const odd = fake(200, {
+			kind: 'install',
+			state: 'running',
+			log: '',
+			progress: { step: 3, steps: 2, text: 'x' }
+		});
+		const kept = await fetchSetupJob(daemon, 't', 'vps', odd.fetcher);
+		expect(kept.state).toBe('running');
+		expect(kept.progress).toBeUndefined();
 		await expect(
 			startSetup(
 				daemon,

@@ -29,6 +29,8 @@
 	import { ConflictError } from '#lib/backend.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
+	import ProgressBar from '#lib/ui/ProgressBar.svelte';
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
 	let daemonUrl = $state(local.url || DEFAULT_DAEMON);
@@ -633,13 +635,16 @@ nepfleet control token</code
 		{/if}
 	{/if}
 	{#if setupJob}
-		<p role="status">
-			{setupJob.state === 'running'
-				? 'Running…'
-				: setupJob.state === 'succeeded'
-					? 'Done.'
-					: `Failed: ${setupJob.error ?? ''}`}
-		</p>
+		{#if setupJob.state === 'running' && setupJob.progress}
+			<ProgressBar {...setupJob.progress} />
+		{:else}
+			<p role="status">
+				{#if setupJob.state === 'running'}<Spinner
+						label="Running…"
+					/>{:else if setupJob.state === 'succeeded'}Done.{:else}Failed:
+					{setupJob.error ?? ''}{/if}
+			</p>
+		{/if}
 		{#if setupJob.log}<pre class="log">{setupJob.log}</pre>{/if}
 	{/if}
 	{#if setupError}<p class="error" role="alert">{setupError}</p>{/if}
