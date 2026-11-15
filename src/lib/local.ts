@@ -331,6 +331,7 @@ export const SETUP_KINDS = [
 	'start',
 	'repair',
 	'host-update',
+	'reboot',
 	'mounts'
 ] as const;
 export type SetupKind = (typeof SETUP_KINDS)[number];
