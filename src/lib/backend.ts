@@ -566,6 +566,89 @@ export function fetchEgress(
 	);
 }
 
+/** One container (Compose) or task (Swarm) of a stack. */
+export interface StackContainer {
+	service: string;
+	name: string;
+	state: string;
+	health?: string;
+	status?: string;
+	image: string;
+	/** Docker's automatic restarts. */
+	restarts: number;
+	node?: string;
+	error?: string;
+}
+
+function isContainers(v: unknown): v is StackContainer[] {
+	return (
+		Array.isArray(v) &&
+		v.every((c) => {
+			if (typeof c !== 'object' || c === null) return false;
+			const o = c as Record<string, unknown>;
+			const opt = (k: string) => o[k] === undefined || typeof o[k] === 'string';
+			return (
+				typeof o.service === 'string' &&
+				typeof o.name === 'string' &&
+				typeof o.state === 'string' &&
+				typeof o.image === 'string' &&
+				Number.isInteger(o.restarts) &&
+				['health', 'status', 'node', 'error'].every(opt)
+			);
+		})
+	);
+}
+
+/** A stack's containers on its backend's host. */
+export function fetchContainers(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<StackContainer[]> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/containers`,
+		isContainers,
+		fetcher,
+		timeoutMs
+	);
+}
+
+export type ServiceAction = 'restart' | 'stop' | 'start';
+
+/** Restarts, stops or starts one service of a stack (apply scope). */
+export async function serviceAction(
+	backend: Backend,
+	token: string,
+	stack: string,
+	service: string,
+	action: ServiceAction,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 120000
+): Promise<void> {
+	const res = await fetcher(
+		`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/services/${encodeURIComponent(service)}/${action}`,
+		{
+			method: 'POST',
+			signal: AbortSignal.timeout(timeoutMs),
+			credentials: authInit(token).credentials,
+			headers: { Accept: 'application/json', ...authInit(token).headers }
+		}
+	);
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError('This needs a token that may apply stacks, or signing in.');
+	if (res.status === 404)
+		throw new NotFoundError('No such service, or the token does not cover it');
+	if (res.status === 503)
+		throw new ConflictError('An apply or restore of this stack is running; try again after it.');
+	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+}
+
 /** A maintenance window as Uptime Kuma lists it. */
 export interface MaintenanceWindow {
 	id: number;
