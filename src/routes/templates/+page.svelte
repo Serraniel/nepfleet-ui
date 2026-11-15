@@ -96,6 +96,32 @@
 		)
 	);
 
+	/**
+	 * What the picked template needs on this backend's host and doesn't find
+	 * there: Caddy for a domain, Uptime Kuma for monitors. Only for the
+	 * backend's own host, and only when the backend says what is installed.
+	 */
+	const needs = $derived.by(() => {
+		const cat = catalogues.find((c) => c.source === picked?.source);
+		if (!picked || !cat?.installed || target !== 'local') return [];
+		const have = new Set(cat.installed);
+		const s = picked.t.supports ?? {};
+		const out: { name: string; why: string }[] = [];
+		if (access === 'domain' && s.ingress && picked.t.name !== 'caddy' && !have.has('caddy'))
+			out.push({ name: 'caddy', why: 'Reaching it on its domain needs Caddy on this host' });
+		if (s.monitoring && picked.t.name !== 'uptime-kuma' && !have.has('uptime-kuma'))
+			out.push({
+				name: 'uptime-kuma',
+				why: 'Its uptime monitor needs Uptime Kuma (it runs without, just unmonitored)'
+			});
+		return out.filter((n) => (cat.templates ?? []).some((t) => t.name === n.name));
+	});
+
+	function pickNamed(source: string, name: string) {
+		const t = catalogues.find((c) => c.source === source)?.templates?.find((x) => x.name === name);
+		if (t) pick({ source, t });
+	}
+
 	function pick(e: { source: string; t: TemplateEntry }) {
 		picked = e;
 		stackName = e.t.name;
@@ -244,6 +270,14 @@
 						<option value="port">on a LAN port of the host (templates with a web UI)</option>
 					</select>
 				</div>
+				{#each needs as n (n.name)}
+					<p class="needs" role="note">
+						{n.why}, and it isn't set up there yet.
+						<Button variant="ghost" onclick={() => picked && pickNamed(picked.source, n.name)}
+							>Set up {n.name} first</Button
+						>
+					</p>
+				{/each}
 				{#each inputs as inp (inp.name)}
 					{#if inp.type !== 'secret'}
 						{@const err = errors[inp.name]}
@@ -367,6 +401,11 @@
 {/if}
 
 <style>
+	.needs {
+		margin: 0;
+		padding-left: 0.6rem;
+		border-left: 3px solid var(--warn);
+	}
 	header p,
 	.muted {
 		color: var(--muted);
