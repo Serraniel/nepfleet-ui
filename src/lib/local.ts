@@ -210,11 +210,29 @@ export interface HostUpdates {
 	rebootRequired: boolean | null;
 	packages?: string[];
 	notes?: string[];
+	/** Arch: when the last full upgrade started. */
+	lastUpgrade?: string;
+	/** Arch news published since then: read before updating. */
+	news?: { title: string; link: string; published: string }[];
+}
+
+function isNewsItem(v: unknown): boolean {
+	if (typeof v !== 'object' || v === null) return false;
+	const n = v as Record<string, unknown>;
+	return (
+		typeof n.title === 'string' &&
+		typeof n.link === 'string' &&
+		(n.link === '' || n.link.startsWith('https://')) &&
+		typeof n.published === 'string'
+	);
 }
 
 function isHostUpdates(v: unknown): v is HostUpdates {
 	if (typeof v !== 'object' || v === null) return false;
 	const h = v as Record<string, unknown>;
+	// The news is extra: malformed, it is dropped, not the answer.
+	if (h.news !== undefined && !(Array.isArray(h.news) && h.news.every(isNewsItem))) delete h.news;
+	if (h.lastUpgrade !== undefined && typeof h.lastUpgrade !== 'string') delete h.lastUpgrade;
 	const strings = (x: unknown) =>
 		x === undefined || x === null || (Array.isArray(x) && x.every((s) => typeof s === 'string'));
 	return (
