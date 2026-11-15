@@ -316,6 +316,7 @@
 		start: 'Start NepFleet',
 		repair: 'Repair NepFleet',
 		'host-update': 'Update the host',
+		reboot: 'Reboot the machine',
 		mounts: 'Network mounts'
 	};
 	const setupTitle = (p: SetupPlan | null) => setupTitles[p?.kind ?? setupAsked ?? 'bootstrap'];
@@ -555,14 +556,24 @@ nepfleet control token</code
 								<p class="error" role="alert">Host updates: {u.error}</p>
 							{:else if u.value}
 								<p role="status">{describeHostUpdates(u.value)}</p>
-								{#if u.value.supported && u.value.pending > 0}
-									<p>
-										<Button
-											onclick={() => openSetup(r, 'host-update')}
-											disabled={!!busy[r.name]}
-											title="Plans the update for you to review; nothing runs until you start it"
-											>Update the host…</Button
-										>
+								{#if (u.value.supported && u.value.pending > 0) || u.value.rebootRequired}
+									<p class="host-actions">
+										{#if u.value.supported && u.value.pending > 0}
+											<Button
+												onclick={() => openSetup(r, 'host-update')}
+												disabled={!!busy[r.name]}
+												title="Plans the update for you to review; nothing runs until you start it"
+												>Update the host…</Button
+											>
+										{/if}
+										{#if u.value.rebootRequired}
+											<Button
+												onclick={() => openSetup(r, 'reboot')}
+												disabled={!!busy[r.name]}
+												title="Plans the reboot and the check afterwards; nothing runs until you start it"
+												>Reboot…</Button
+											>
+										{/if}
 									</p>
 								{/if}
 								{#if u.value.packages?.length}
@@ -788,6 +799,11 @@ nepfleet control token</code
 	}
 	.doctor .fix code {
 		overflow-wrap: anywhere;
+	}
+	.host-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 	}
 	.host-updates p {
 		margin: 0.25rem 0;
