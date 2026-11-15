@@ -14,6 +14,8 @@ import {
 	NotFoundError,
 	fetchHistory,
 	fetchEgress,
+	fetchContainers,
+	serviceAction,
 	fetchMaintenance,
 	fetchUpdates,
 	fetchInfo,
@@ -396,6 +398,47 @@ describe('fetchEgress', () => {
 				JSON.stringify({ mode: 'log', sidecars: 1, hosts: null })
 			)) as unknown as typeof fetch;
 		await expect(fetchEgress(backend, 't', 'web', odd)).rejects.toThrow(/Unexpected/);
+	});
+});
+
+describe('containers', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const reply = (status: number, body?: unknown) => {
+		const calls: string[] = [];
+		const fetcher = (async (url: string, init?: RequestInit) => {
+			calls.push(`${init?.method ?? 'GET'} ${url}`);
+			return new Response(body === undefined ? null : JSON.stringify(body), { status });
+		}) as unknown as typeof fetch;
+		return { fetcher, calls };
+	};
+	it('lists them, and refuses odd answers', async () => {
+		const web = {
+			service: 'web',
+			name: 'web-web-1',
+			state: 'running',
+			health: 'healthy',
+			image: 'nginx:1.29',
+			restarts: 0
+		};
+		const ok = reply(200, [web]);
+		expect(await fetchContainers(backend, 't', 'web', ok.fetcher)).toEqual([web]);
+		expect(ok.calls[0]).toBe('GET https://fleet.example.org/api/v1/stacks/web/containers');
+		await expect(
+			fetchContainers(backend, 't', 'web', reply(200, [{ ...web, restarts: 'many' }]).fetcher)
+		).rejects.toThrow(/Unexpected/);
+	});
+	it('acts on a service, and names why it can not', async () => {
+		const ok = reply(204);
+		await serviceAction(backend, 't', 'web', 'db', 'restart', ok.fetcher);
+		expect(ok.calls[0]).toBe(
+			'POST https://fleet.example.org/api/v1/stacks/web/services/db/restart'
+		);
+		await expect(
+			serviceAction(backend, 't', 'web', 'db', 'stop', reply(503).fetcher)
+		).rejects.toBeInstanceOf(ConflictError);
+		await expect(
+			serviceAction(backend, 't', 'web', 'db', 'stop', reply(403).fetcher)
+		).rejects.toBeInstanceOf(ScopeError);
 	});
 });
 
