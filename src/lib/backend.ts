@@ -617,6 +617,33 @@ export function fetchContainers(
 	);
 }
 
+/** The last lines of one of a stack's containers (edit scope: logs hold secrets). */
+export async function fetchLogs(
+	backend: Backend,
+	token: string,
+	stack: string,
+	container: string,
+	lines = 200,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<string> {
+	const res = await fetcher(
+		`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/containers/${encodeURIComponent(container)}/logs?lines=${lines}`,
+		{
+			signal: AbortSignal.timeout(timeoutMs),
+			credentials: authInit(token).credentials,
+			headers: { Accept: 'text/plain', ...authInit(token).headers }
+		}
+	);
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) throw new ScopeError(scopeMessage('edit'));
+	if (res.status === 404)
+		throw new NotFoundError('No such container, or the token does not cover it');
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	return res.text();
+}
+
 export type ServiceAction = 'restart' | 'stop' | 'start';
 
 /** Restarts, stops or starts one service of a stack (apply scope). */
