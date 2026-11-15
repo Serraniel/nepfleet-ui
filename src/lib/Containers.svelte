@@ -5,6 +5,7 @@
 		type ServiceAction,
 		type StackContainer,
 		fetchContainers,
+		fetchLogs,
 		serviceAction
 	} from '#lib/backend.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -45,6 +46,23 @@
 		} finally {
 			delete busy[service];
 		}
+	}
+
+	/** Per container: its last lines, shown below its row while open. */
+	let logs = $state<Record<string, { text?: string; error?: string; loading: boolean }>>({});
+
+	async function loadLogs(container: string) {
+		logs[container] = { ...logs[container], loading: true };
+		try {
+			logs[container] = { text: await fetchLogs(backend, token, stack, container), loading: false };
+		} catch (e) {
+			logs[container] = { error: e instanceof Error ? e.message : String(e), loading: false };
+		}
+	}
+
+	function toggleLogs(container: string) {
+		if (logs[container]) delete logs[container];
+		else void loadLogs(container);
 	}
 
 	/** The first row of each service carries its buttons. */
@@ -99,6 +117,12 @@
 							<td><code>{c.image}</code></td>
 							<td>{c.restarts}</td>
 							<td class="actions">
+								<Button
+									variant="ghost"
+									onclick={() => toggleLogs(c.name)}
+									busy={logs[c.name]?.loading}
+									aria-expanded={!!logs[c.name]}>{logs[c.name] ? 'Hide logs' : 'Logs'}</Button
+								>
 								{#if firstOfService(i)}
 									<Button
 										variant="ghost"
@@ -126,13 +150,34 @@
 								{/if}
 							</td>
 						</tr>
+						{#if logs[c.name]}
+							{@const l = logs[c.name]!}
+							<tr class="logs-row">
+								<td colspan="5">
+									{#if l.error}
+										<p class="error" role="alert">{l.error}</p>
+									{:else if l.text !== undefined}
+										<div class="row">
+											<span class="muted small">The last 200 lines of {c.name}</span>
+											<Button variant="ghost" onclick={() => loadLogs(c.name)} busy={l.loading}
+												>Refresh</Button
+											>
+										</div>
+										<pre class="logs">{l.text || '(no output)'}</pre>
+									{:else}
+										<Spinner label="Reading its logs…" />
+									{/if}
+								</td>
+							</tr>
+						{/if}
 					{/each}
 				</tbody>
 			</table>
 		</div>
 		<p class="muted small">
 			Restarting or stopping a service changes nothing in the fleet repository: the next apply
-			brings it back to what the stack says. Logs are in Dozzle.
+			brings it back to what the stack says. Logs here need a token that may edit the stack: they
+			often hold secrets. To follow them live, use Dozzle.
 		</p>
 	{/if}
 </section>
@@ -160,6 +205,18 @@
 	}
 	.actions {
 		white-space: nowrap;
+	}
+	.logs {
+		max-height: 24rem;
+		overflow: auto;
+		margin: 0.25rem 0 0;
+		padding: 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 0.4rem;
+		background: var(--surface-2);
+		font-size: 0.8rem;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 	}
 	.small {
 		font-size: 0.85rem;

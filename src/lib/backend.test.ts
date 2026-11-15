@@ -15,6 +15,7 @@ import {
 	fetchHistory,
 	fetchEgress,
 	fetchContainers,
+	fetchLogs,
 	serviceAction,
 	fetchMaintenance,
 	fetchUpdates,
@@ -426,6 +427,20 @@ describe('containers', () => {
 		await expect(
 			fetchContainers(backend, 't', 'web', reply(200, [{ ...web, restarts: 'many' }]).fetcher)
 		).rejects.toThrow(/Unexpected/);
+	});
+	it('reads logs as text, and says when the token may not', async () => {
+		const calls: string[] = [];
+		const ok = (async (url: string) => {
+			calls.push(url);
+			return new Response('2026-11-15T10:00:00Z hello\n');
+		}) as unknown as typeof fetch;
+		expect(await fetchLogs(backend, 't', 'web', 'web-web-1', 50, ok)).toContain('hello');
+		expect(calls[0]).toBe(
+			'https://fleet.example.org/api/v1/stacks/web/containers/web-web-1/logs?lines=50'
+		);
+		await expect(
+			fetchLogs(backend, 't', 'web', 'web-web-1', 50, reply(403).fetcher)
+		).rejects.toBeInstanceOf(ScopeError);
 	});
 	it('acts on a service, and names why it can not', async () => {
 		const ok = reply(204);
