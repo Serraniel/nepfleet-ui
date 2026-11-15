@@ -342,12 +342,15 @@ const IMAGE_TAG = /:v?(\d+\.\d+\.\d+)(@|$)/;
 
 /**
  * The version to update a machine's NepFleet container to: the daemon's,
- * when it's a release newer than what runs there (from the image tag).
+ * when it's a release newer than what runs there (from the image tag). A
+ * daemon built from main ("edge", the nepfleet-git package) always offers
+ * edge, the newest main, to a machine that runs a NepFleet container.
  */
 export function updateOffer(
 	report: RemoteReport | undefined,
 	daemonVersion: string
 ): string | null {
+	if (daemonVersion === 'edge') return report?.nepfleetImage ? 'edge' : null;
 	const target = RELEASE.exec(daemonVersion);
 	const running = report?.nepfleetImage ? IMAGE_TAG.exec(report.nepfleetImage) : null;
 	const current = running?.[1] ? RELEASE.exec(running[1]) : null;
