@@ -564,6 +564,21 @@ nepfleet control token</code
 										</p>
 									</details>
 								{/if}
+								{#if u.value.news?.length}
+									<div class="news" role="alert">
+										<strong>Arch news since the last update: read it before updating.</strong>
+										<ul>
+											{#each u.value.news as n, i (i)}
+												<li>
+													{#if n.link}<a href={n.link} target="_blank" rel="noopener noreferrer"
+															>{n.title}</a
+														>{:else}{n.title}{/if}
+													<span class="muted">({new Date(n.published).toLocaleDateString()})</span>
+												</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
 								{#each u.value.notes ?? [] as note, i (i)}<p class="muted">{note}</p>{/each}
 							{/if}
 						</div>
@@ -752,6 +767,14 @@ nepfleet control token</code
 	}
 	.host-updates p {
 		margin: 0.25rem 0;
+	}
+	.host-updates .news {
+		padding-left: 0.6rem;
+		border-left: 3px solid var(--warn);
+	}
+	.host-updates .news ul {
+		margin: 0.25rem 0 0;
+		padding-left: 1.1rem;
 	}
 	.host-updates .packages {
 		overflow-wrap: anywhere;

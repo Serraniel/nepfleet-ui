@@ -311,6 +311,28 @@ group('checkHostUpdates', () => {
 		);
 		expect(describeHostUpdates({ ...arch, os: 'gentoo', supported: false })).toContain('gentoo');
 	});
+	it('keeps Arch news, and drops news with an odd link', async () => {
+		const item = {
+			title: 'Manual step',
+			link: 'https://archlinux.org/news/x/',
+			published: '2026-10-21T13:58:42Z'
+		};
+		const ok = await checkHostUpdates(
+			'http://127.0.0.1:7481',
+			'nfc_x',
+			'vps',
+			answering({ ...arch, lastUpgrade: '2026-10-20T10:00:00Z', news: [item] })
+		);
+		expect(ok.news).toEqual([item]);
+		const odd = await checkHostUpdates(
+			'http://127.0.0.1:7481',
+			'nfc_x',
+			'vps',
+			answering({ ...arch, news: [{ ...item, link: 'javascript:alert(1)' }] })
+		);
+		expect(odd.news).toBeUndefined();
+		expect(odd.pending).toBe(2);
+	});
 	it('refuses odd answers', async () => {
 		for (const body of [
 			{},
