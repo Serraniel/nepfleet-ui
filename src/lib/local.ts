@@ -332,6 +332,7 @@ export const SETUP_KINDS = [
 	'repair',
 	'host-update',
 	'reboot',
+	'ssh-harden',
 	'mounts'
 ] as const;
 export type SetupKind = (typeof SETUP_KINDS)[number];

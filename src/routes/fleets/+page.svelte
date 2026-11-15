@@ -317,6 +317,7 @@
 		repair: 'Repair NepFleet',
 		'host-update': 'Update the host',
 		reboot: 'Reboot the machine',
+		'ssh-harden': 'Turn off SSH password logins',
 		mounts: 'Network mounts'
 	};
 	const setupTitle = (p: SetupPlan | null) => setupTitles[p?.kind ?? setupAsked ?? 'bootstrap'];
@@ -537,6 +538,13 @@ nepfleet control token</code
 								busy={busy[r.name] === 'updates'}
 								title="Asks the machine's package manager over SSH what it has pending; installs nothing"
 								>Check host updates</Button
+							>
+							<Button
+								variant="ghost"
+								onclick={() => openSetup(r, 'ssh-harden')}
+								disabled={!!busy[r.name]}
+								title="Plans it for you to review: only keys can log in afterwards, as this app already does"
+								>Turn off SSH password logins…</Button
 							>
 						{/if}
 						<Button
