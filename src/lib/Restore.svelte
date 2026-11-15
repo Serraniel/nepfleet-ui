@@ -11,6 +11,8 @@
 	} from '#lib/backend.ts';
 	import { verifyIdentity } from '#lib/login.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import ProgressBar from '#lib/ui/ProgressBar.svelte';
+	import Spinner from '#lib/ui/Spinner.svelte';
 	import TextField from '#lib/ui/TextField.svelte';
 
 	type Props = { backend: Backend; token: string; stack: string };
@@ -115,13 +117,16 @@
 	{/if}
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
 	{#if job}
-		<p role="status" class:error={job.state === 'failed'}>
-			{job.state === 'running'
-				? 'Restoring…'
-				: job.state === 'succeeded'
-					? 'Restored.'
-					: `Failed: ${job.error ?? 'see the log'}`}
-		</p>
+		{#if job.state === 'running' && job.progress}
+			<ProgressBar {...job.progress} />
+		{:else}
+			<p role="status" class:error={job.state === 'failed'}>
+				{#if job.state === 'running'}<Spinner
+						label="Restoring…"
+					/>{:else if job.state === 'succeeded'}Restored.{:else}Failed:
+					{job.error ?? 'see the log'}{/if}
+			</p>
+		{/if}
 		{#if job.log}<pre>{job.log}</pre>{/if}
 	{/if}
 </section>
