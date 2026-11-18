@@ -1343,7 +1343,14 @@ export async function revokeToken(
 export interface DoctorReport {
 	host: string;
 	stacks: number;
-	checks: { name: string; status: 'ok' | 'warn' | 'fail'; detail: string; fix?: string }[];
+	checks: {
+		name: string;
+		status: 'ok' | 'warn' | 'fail';
+		detail: string;
+		fix?: string;
+		/** A fix the app can start: dns-records is letCaddyKeepDNS. */
+		action?: string;
+	}[];
 	security: { check: string; level: string; message: string }[];
 	securityError?: string;
 }
@@ -1366,6 +1373,49 @@ function isDoctorReport(v: unknown): v is DoctorReport {
 }
 
 /** Runs the backend host's checks (admin scope); null on an older backend. */
+/** The domain a DNS check names: "dozzle: monitor.example.org doesn't resolve…". */
+export function dnsDomain(detail: string): string {
+	return /^[^:]+: (\S+) /.exec(detail)?.[1] ?? '';
+}
+
+/**
+ * Turns on the backend's Caddy option "Create the sites' DNS records" for a
+ * zone, committed there; returns the Caddy stack, whose plan shows the change.
+ */
+export async function letCaddyKeepDNS(
+	backend: Backend,
+	token: string,
+	zone: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<{ stack: string; commit: string }> {
+	const res = await fetcher(`${backend.url}/api/v1/dns-records`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify({ zone })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) throw new ScopeError(scopeMessage('admin'));
+	if (res.status === 404)
+		throw new Error('This backend is too old for that: update its NepFleet first.');
+	if (res.status === 409)
+		throw new ConflictError(
+			"Caddy's stack has uncommitted changes on the server: commit them first."
+		);
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const body = (await res.json()) as Record<string, unknown>;
+	if (typeof body.stack !== 'string' || typeof body.commit !== 'string')
+		throw new Error('Unexpected response');
+	return { stack: body.stack, commit: body.commit };
+}
+
 export async function fetchDoctor(
 	backend: Backend,
 	token: string,

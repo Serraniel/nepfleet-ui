@@ -29,7 +29,10 @@
 		updateOffer
 	} from '#lib/local.ts';
 	import TextField from '#lib/ui/TextField.svelte';
-	import { ConflictError } from '#lib/backend.ts';
+	import { ConflictError, dnsDomain } from '#lib/backend.ts';
+	import { backends } from '#lib/backends.svelte.ts';
+	import { tokens } from '#lib/stacks.svelte.ts';
+	import DNSRecordsFix from '#lib/DNSRecordsFix.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import ProgressBar from '#lib/ui/ProgressBar.svelte';
@@ -633,7 +636,20 @@ nepfleet control token</code
 											<strong>{c.status === 'fail' ? '✗' : '⚠'} {c.name}</strong>
 											{#if c.detail}<span>{c.detail}</span>{/if}
 											{#if c.fix}<span class="fix">Fix: <code>{c.fix}</code></span>{/if}
-											{#if c.action}
+											{#if c.action === 'dns-records'}
+												{@const live = backends.list.find((b) => b.id === 'local:' + r.name)}
+												{#if live && !problems.slice(0, i).some((p) => p.action === 'dns-records')}
+													<DNSRecordsFix
+														backend={live}
+														token={tokens.byBackend[live.id] ?? ''}
+														domain={dnsDomain(c.detail ?? '')}
+													/>
+												{:else if !live}
+													<span class="muted"
+														>Connect to {r.name} to let its Caddy create the records from here.</span
+													>
+												{/if}
+											{:else if c.action}
 												{@const kind = c.action}
 												<span
 													><Button onclick={() => openSetup(r, kind)} disabled={!!busy[r.name]}
