@@ -1247,6 +1247,87 @@ export async function setChannel(
 	return o.commit;
 }
 
+/** Which events go to which channels; empty events or stacks match all. */
+export interface NotifyRoute {
+	channels: string[];
+	events: string[];
+	stacks: string[];
+	minSeverity?: 'info' | 'warning' | 'error';
+}
+
+function isRoutes(v: unknown): v is { routes: NotifyRoute[] } {
+	if (typeof v !== 'object' || v === null) return false;
+	const rs = (v as Record<string, unknown>).routes;
+	const strings = (x: unknown) => Array.isArray(x) && x.every((s) => typeof s === 'string');
+	return (
+		Array.isArray(rs) &&
+		rs.every((r) => {
+			if (typeof r !== 'object' || r === null) return false;
+			const o = r as Record<string, unknown>;
+			return (
+				strings(o.channels) &&
+				strings(o.events) &&
+				strings(o.stacks) &&
+				(o.minSeverity === undefined ||
+					['info', 'warning', 'error'].includes(o.minSeverity as string))
+			);
+		})
+	);
+}
+
+/** The fleet's notification routes, or null from a backend too old to list them. */
+export async function fetchRoutes(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<NotifyRoute[] | null> {
+	try {
+		const body = await apiGet(
+			backend,
+			token,
+			'/api/v1/notifications/routes',
+			isRoutes,
+			fetcher,
+			timeoutMs
+		);
+		return body.routes;
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}
+
+/** Replaces the fleet's notification routes, committed there; returns the commit. */
+export async function saveRoutes(
+	backend: Backend,
+	token: string,
+	routes: NotifyRoute[],
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	const res = await fetcher(`${backend.url}/api/v1/notifications/routes`, {
+		method: 'PUT',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify({ routes })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403)
+		throw new ScopeError('Changing routes needs an admin token, or signing in.');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown };
+	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
+	return o.commit;
+}
+
 /** A CycloneDX SBOM of a stack, or of the fleet's stacks the token sees (stack ''). */
 export async function fetchSBOM(
 	backend: Backend,
