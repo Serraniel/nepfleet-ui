@@ -160,11 +160,11 @@ export interface DoctorCheck {
 	status: 'ok' | 'warn' | 'fail';
 	detail?: string;
 	fix?: string;
-	/** A setup kind that applies the fix as a reviewed plan. */
-	action?: 'start' | 'repair';
+	/** A setup kind that applies the fix as a reviewed plan, or dns-records: a call to the machine's API. */
+	action?: 'start' | 'repair' | 'dns-records';
 }
 
-const DOCTOR_ACTIONS: readonly unknown[] = ['start', 'repair'];
+const DOCTOR_ACTIONS: readonly unknown[] = ['start', 'repair', 'dns-records'];
 
 function isDoctorCheck(v: unknown): v is DoctorCheck {
 	if (typeof v !== 'object' || v === null) return false;

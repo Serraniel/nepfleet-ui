@@ -15,6 +15,8 @@ import {
 	fetchHistory,
 	fetchEgress,
 	fetchContainers,
+	dnsDomain,
+	letCaddyKeepDNS,
 	fetchLogs,
 	serviceAction,
 	fetchMaintenance,
@@ -1082,6 +1084,36 @@ describe('setChannel', () => {
 		);
 		await expect(setChannel(backend, 't', 'p', 'ntfy://x', 'warning', answer(403))).rejects.toThrow(
 			'admin'
+		);
+	});
+});
+
+describe('DNS records fix', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('reads the domain from a DNS check', () => {
+		expect(
+			dnsDomain("dozzle: monitor.vps.example.org doesn't resolve, so the site can't be reached")
+		).toBe('monitor.vps.example.org');
+		expect(dnsDomain('nothing here')).toBe('');
+	});
+	it('turns Caddy’s records on, and says why not', async () => {
+		const calls: { url: string; body: string }[] = [];
+		const ok = (async (url: string, init: RequestInit) => {
+			calls.push({ url, body: String(init.body) });
+			return new Response(JSON.stringify({ stack: 'caddy', commit: 'abc' }));
+		}) as unknown as typeof fetch;
+		expect(await letCaddyKeepDNS(backend, 't', 'example.org', ok)).toEqual({
+			stack: 'caddy',
+			commit: 'abc'
+		});
+		expect(calls[0]).toEqual({
+			url: 'https://fleet.example.org/api/v1/dns-records',
+			body: '{"zone":"example.org"}'
+		});
+		const refused = (async () =>
+			new Response('no Caddy stack runs on this host', { status: 422 })) as unknown as typeof fetch;
+		await expect(letCaddyKeepDNS(backend, 't', 'example.org', refused)).rejects.toThrow(
+			'no Caddy stack'
 		);
 	});
 });

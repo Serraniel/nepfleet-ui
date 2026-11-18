@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { type DoctorReport, fetchDoctor } from '#lib/backend.ts';
+	import { type DoctorReport, dnsDomain, fetchDoctor } from '#lib/backend.ts';
+	import DNSRecordsFix from '#lib/DNSRecordsFix.svelte';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
@@ -82,6 +83,14 @@
 						</li>
 					{/each}
 				</ul>
+				{@const dns = r.checks.find((c) => c.action === 'dns-records')}
+				{#if dns}
+					<DNSRecordsFix
+						backend={b}
+						token={tokens.byBackend[b.id] ?? ''}
+						domain={dnsDomain(dns.detail)}
+					/>
+				{/if}
 				<Mirrors backend={b} token={tokens.byBackend[b.id] ?? ''} />
 				<h3>Security</h3>
 				{#if r.securityError}
