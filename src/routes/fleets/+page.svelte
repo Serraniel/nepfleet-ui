@@ -205,6 +205,20 @@
 		}
 	}
 
+	/** Linux machines whose host updates can be checked. */
+	const linuxRemotes = $derived(local.remotes.filter((r) => r.report?.kernel === 'Linux'));
+	let checkingAll = $state(false);
+
+	/** Checks every Linux machine's pending updates at once, each as its own button would. */
+	async function checkAllUpdates() {
+		checkingAll = true;
+		try {
+			await Promise.all(linuxRemotes.filter((r) => !busy[r.name]).map((r) => checkUpdates(r)));
+		} finally {
+			checkingAll = false;
+		}
+	}
+
 	async function act(r: Remote, action: 'refresh' | 'connect' | 'disconnect') {
 		busy[r.name] = action;
 		actionError = '';
@@ -365,6 +379,14 @@
 		Manage machines from here through the NepFleet control daemon on this computer. It keeps running
 		when you close this page, and reaches them over SSH with your keys.
 	</p>
+	{#if linuxRemotes.length > 1}
+		<Button
+			onclick={checkAllUpdates}
+			busy={checkingAll}
+			title="Asks every machine's package manager what it has pending; installs nothing"
+			>Check host updates on all {linuxRemotes.length} machines</Button
+		>
+	{/if}
 </header>
 
 {#if !local.connected && desktop}
