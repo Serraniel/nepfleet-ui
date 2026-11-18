@@ -58,7 +58,9 @@ import {
 	importCompose,
 	neededScope,
 	scopeMessage,
-	setChannel
+	setChannel,
+	fetchRoutes,
+	saveRoutes
 } from './backend.ts';
 
 describe('stackRelations', () => {
@@ -1153,5 +1155,39 @@ describe('followLogs', () => {
 		await expect(
 			followLogs(backend, 't', 'web', 'x', () => {}, new AbortController().signal, 50, old)
 		).rejects.toThrow('too old');
+	});
+});
+
+describe('notification routes', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('lists the routes, or null from an old backend', async () => {
+		const ok = (async () =>
+			new Response(
+				JSON.stringify({
+					routes: [{ channels: ['phone'], events: ['apply.*'], stacks: [], minSeverity: 'error' }]
+				})
+			)) as unknown as typeof fetch;
+		expect(await fetchRoutes(backend, 't', ok)).toEqual([
+			{ channels: ['phone'], events: ['apply.*'], stacks: [], minSeverity: 'error' }
+		]);
+		const old = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+		expect(await fetchRoutes(backend, 't', old)).toBeNull();
+		const odd = (async () =>
+			new Response(JSON.stringify({ routes: [{ channels: 'phone' }] }))) as unknown as typeof fetch;
+		await expect(fetchRoutes(backend, 't', odd)).rejects.toThrow();
+	});
+	it('PUTs the whole list and returns the commit', async () => {
+		let body: unknown;
+		const fetcher = (async (_u: string, init: RequestInit) => {
+			expect(init.method).toBe('PUT');
+			body = JSON.parse(init.body as string);
+			return new Response(JSON.stringify({ commit: 'abc' }));
+		}) as unknown as typeof fetch;
+		const routes = [{ channels: ['phone'], events: [], stacks: ['web'] }];
+		expect(await saveRoutes(backend, 't', routes, fetcher)).toBe('abc');
+		expect(body).toEqual({ routes });
+		const refused = (async () =>
+			new Response('unknown channel "pager"', { status: 400 })) as unknown as typeof fetch;
+		await expect(saveRoutes(backend, 't', routes, refused)).rejects.toThrow('unknown channel');
 	});
 });

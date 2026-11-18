@@ -5,6 +5,7 @@
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import ChannelAdd from '#lib/ChannelAdd.svelte';
+	import RoutesEditor from '#lib/RoutesEditor.svelte';
 
 	let byBackend = $state<Record<string, string[] | null | { error: string }>>({});
 	let result = $state<Record<string, { ok: boolean; text: string }>>({});
@@ -125,6 +126,11 @@
 			{/if}
 			{#if cs !== undefined && cs !== null && !('error' in cs)}
 				<ChannelAdd label={b.label ?? b.url} save={(name, url, min) => add(b.id, name, url, min)} />
+				{#if cs.length}<RoutesEditor
+						backend={b}
+						token={tokens.byBackend[b.id] ?? ''}
+						channels={cs}
+					/>{/if}
 			{/if}
 		{/each}
 	</section>
