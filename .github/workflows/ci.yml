@@ -29,7 +29,9 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
-      - run: npm audit --audit-level=high --omit=dev
+      # High and critical advisories fail, unless .github/audit-allowlist
+      # accepts them until a date, with why.
+      - run: ./scripts/audit.sh
 
   # The built UI against a real `nepfleet serve` in Chromium, with axe-core
   # checking WCAG 2.2 AA on every page state the tests reach.
