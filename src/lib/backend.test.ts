@@ -18,6 +18,7 @@ import {
 	dnsDomain,
 	letCaddyKeepDNS,
 	fetchLogs,
+	followLogs,
 	serviceAction,
 	fetchMaintenance,
 	fetchUpdates,
@@ -1115,5 +1116,42 @@ describe('DNS records fix', () => {
 		await expect(letCaddyKeepDNS(backend, 't', 'example.org', refused)).rejects.toThrow(
 			'no Caddy stack'
 		);
+	});
+});
+
+describe('followLogs', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	it('hands over each chunk as it comes, and says why not', async () => {
+		let url = '';
+		const streaming = (async (u: string) => {
+			url = u;
+			const body = new ReadableStream({
+				start(c) {
+					c.enqueue(new TextEncoder().encode('first\n'));
+					c.enqueue(new TextEncoder().encode('second\n'));
+					c.close();
+				}
+			});
+			return new Response(body);
+		}) as unknown as typeof fetch;
+		const got: string[] = [];
+		await followLogs(
+			backend,
+			't',
+			'web',
+			'web-web-1',
+			(t) => got.push(t),
+			new AbortController().signal,
+			50,
+			streaming
+		);
+		expect(got.join('')).toBe('first\nsecond\n');
+		expect(url).toBe(
+			'https://fleet.example.org/api/v1/stacks/web/containers/web-web-1/logs?lines=50&follow=1'
+		);
+		const old = (async () => new Response('', { status: 501 })) as unknown as typeof fetch;
+		await expect(
+			followLogs(backend, 't', 'web', 'x', () => {}, new AbortController().signal, 50, old)
+		).rejects.toThrow('too old');
 	});
 });

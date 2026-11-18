@@ -618,6 +618,44 @@ export function fetchContainers(
 }
 
 /** The last lines of one of a stack's containers (edit scope: logs hold secrets). */
+/**
+ * Follows one of a stack's containers' output: the last lines, then what
+ * comes, each chunk handed to onText, until signal aborts or the server ends
+ * the stream (after 30 minutes; follow again).
+ */
+export async function followLogs(
+	backend: Backend,
+	token: string,
+	stack: string,
+	container: string,
+	onText: (text: string) => void,
+	signal: AbortSignal,
+	lines = 200,
+	fetcher: typeof fetch = fetch
+): Promise<void> {
+	const res = await fetcher(
+		`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/containers/${encodeURIComponent(container)}/logs?lines=${lines}&follow=1`,
+		{
+			signal,
+			credentials: authInit(token).credentials,
+			headers: { Accept: 'text/plain', ...authInit(token).headers }
+		}
+	);
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 403) throw new ScopeError(scopeMessage('edit'));
+	if (res.status === 404)
+		throw new NotFoundError('No such container, or the token does not cover it');
+	if (res.status === 501)
+		throw new Error('This backend is too old to follow logs: update its NepFleet.');
+	if (!res.ok || !res.body) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) return;
+		onText(value);
+	}
+}
+
 export async function fetchLogs(
 	backend: Backend,
 	token: string,

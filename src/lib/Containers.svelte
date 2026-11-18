@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import {
 		type Backend,
 		type ServiceAction,
 		type StackContainer,
 		fetchContainers,
 		fetchLogs,
+		followLogs,
 		serviceAction
 	} from '#lib/backend.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -61,9 +62,67 @@
 	}
 
 	function toggleLogs(container: string) {
-		if (logs[container]) delete logs[container];
-		else void loadLogs(container);
+		if (logs[container]) {
+			stopFollowing(container);
+			delete logs[container];
+		} else void loadLogs(container);
 	}
+
+	// Following: the newest output appended as it comes, at most so much kept.
+	const KEEP = 200_000;
+	const following: Record<string, AbortController> = {};
+	let followed = $state<Record<string, boolean>>({});
+
+	function stopFollowing(container: string) {
+		following[container]?.abort();
+		delete following[container];
+		delete followed[container];
+	}
+
+	async function follow(container: string) {
+		const stop = new AbortController();
+		following[container] = stop;
+		followed[container] = true;
+		logs[container] = { text: '', loading: false };
+		// The server ends a stream after 30 minutes: start again until stopped.
+		while (!stop.signal.aborted) {
+			try {
+				await followLogs(
+					backend,
+					token,
+					stack,
+					container,
+					(t) => {
+						const now = (logs[container]?.text ?? '') + t;
+						logs[container] = { text: now.length > KEEP ? now.slice(-KEEP) : now, loading: false };
+					},
+					stop.signal
+				);
+			} catch (e) {
+				if (stop.signal.aborted) break;
+				logs[container] = {
+					...logs[container],
+					error: e instanceof Error ? e.message : String(e),
+					loading: false
+				};
+				break;
+			}
+		}
+		if (following[container] === stop) stopFollowing(container);
+	}
+
+	/** Keeps a followed log scrolled to its newest line (param: the text, or null). */
+	function stickToEnd(node: HTMLElement, text: string | null) {
+		const end = (t: string | null) => {
+			if (t !== null) node.scrollTop = node.scrollHeight;
+		};
+		end(text);
+		return { update: end };
+	}
+
+	onDestroy(() => {
+		for (const c of Object.keys(following)) following[c]?.abort();
+	});
 
 	/** The first row of each service carries its buttons. */
 	const firstOfService = (i: number) =>
@@ -158,12 +217,25 @@
 										<p class="error" role="alert">{l.error}</p>
 									{:else if l.text !== undefined}
 										<div class="row">
-											<span class="muted small">The last 200 lines of {c.name}</span>
-											<Button variant="ghost" onclick={() => loadLogs(c.name)} busy={l.loading}
-												>Refresh</Button
+											<span class="muted small" role="status"
+												>{followed[c.name]
+													? `Following ${c.name}: new output appears as it comes`
+													: `The last 200 lines of ${c.name}`}</span
 											>
+											<span>
+												{#if followed[c.name]}
+													<Button variant="ghost" onclick={() => stopFollowing(c.name)}>Stop</Button
+													>
+												{:else}
+													<Button variant="ghost" onclick={() => loadLogs(c.name)} busy={l.loading}
+														>Refresh</Button
+													>
+													<Button variant="ghost" onclick={() => follow(c.name)}>Follow</Button>
+												{/if}
+											</span>
 										</div>
-										<pre class="logs">{l.text || '(no output)'}</pre>
+										<pre class="logs" use:stickToEnd={followed[c.name] ? l.text : null}>{l.text ||
+												(followed[c.name] ? '(waiting for output)' : '(no output)')}</pre>
 									{:else}
 										<Spinner label="Reading its logs…" />
 									{/if}
