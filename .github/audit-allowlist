@@ -1,0 +1,9 @@
+# Advisories npm audit reports that don't apply to what nepfleet-ui ships,
+# one per line: GHSA id, the date to look again (YYYY-MM-DD), and why.
+# scripts/audit.sh fails on any other high or critical advisory, and on an
+# entry whose date has passed: an entry is a decision with an end, not a mute.
+
+# picomatch <= 4.0.7: ReDoS through repeated extglobs. Only build and test
+# tools use it (vite, tinyglobby, svelte-check, vitest), on this project's
+# own globs; none of it is in the built app. No fixed release yet.
+GHSA-fc5q-39xc-vjpf 2026-12-31 picomatch: build tooling only, no fix released
