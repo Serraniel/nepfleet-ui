@@ -29,6 +29,7 @@
 		updateOffer
 	} from '#lib/local.ts';
 	import TextField from '#lib/ui/TextField.svelte';
+	import { ago, loadChecked, saveChecked } from '#lib/hostupdates-cache.ts';
 	import { ConflictError, dnsDomain } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
@@ -192,14 +193,30 @@
 	}
 
 	/** Per machine: its package manager's last answer. */
-	let hostUpdates = $state<Record<string, { value?: HostUpdates; error?: string }>>({});
+	// The last answers are remembered in this browser, so the overview stands
+	// without checking every machine again.
+	let hostUpdates =
+		$state<Record<string, { value?: HostUpdates; error?: string; at?: string }>>(loadChecked());
+
+	function remember() {
+		const keep: Record<string, { value: HostUpdates; at: string }> = {};
+		for (const [name, u] of Object.entries(hostUpdates))
+			if (u.value && u.at) keep[name] = { value: $state.snapshot(u.value), at: u.at };
+		saveChecked(keep);
+	}
 
 	async function checkUpdates(r: Remote) {
 		busy[r.name] = 'updates';
 		try {
-			hostUpdates[r.name] = { value: await checkHostUpdates(local.url, local.token, r.name) };
+			const value = await checkHostUpdates(local.url, local.token, r.name);
+			hostUpdates[r.name] = { value, at: new Date().toISOString() };
+			remember();
 		} catch (e) {
-			hostUpdates[r.name] = { error: e instanceof Error ? e.message : String(e) };
+			// The last good answer stays beside the error.
+			hostUpdates[r.name] = {
+				...hostUpdates[r.name],
+				error: e instanceof Error ? e.message : String(e)
+			};
 		} finally {
 			delete busy[r.name];
 		}
@@ -208,6 +225,14 @@
 	/** Linux machines whose host updates can be checked. */
 	const linuxRemotes = $derived(local.remotes.filter((r) => r.report?.kernel === 'Linux'));
 	let checkingAll = $state(false);
+
+	/** The machines with a remembered answer, for the overview. */
+	const overview = $derived(
+		linuxRemotes.flatMap((r) => {
+			const u = hostUpdates[r.name];
+			return u?.value && u.at ? [{ name: r.name, value: u.value, at: u.at }] : [];
+		})
+	);
 
 	/** Checks every Linux machine's pending updates at once, each as its own button would. */
 	async function checkAllUpdates() {
@@ -387,6 +412,40 @@
 			>Check host updates on all {linuxRemotes.length} machines</Button
 		>
 	{/if}
+	{#if overview.length}
+		<table class="hosts" aria-label="Host updates per machine, as last checked">
+			<thead>
+				<tr
+					><th scope="col">Machine</th><th scope="col">OS</th><th scope="col">Updates</th><th
+						scope="col">Security</th
+					><th scope="col">Reboot</th><th scope="col">Checked</th></tr
+				>
+			</thead>
+			<tbody>
+				{#each overview as o (o.name)}
+					{@const v = o.value}
+					<tr>
+						<th scope="row"><a href="#machine-{o.name}">{o.name}</a></th>
+						<td>{v.os}</td>
+						<td
+							>{#if !v.supported}<span class="muted">can't check</span
+								>{:else}{v.pending}{#if v.fresh === false}<span
+										class="muted"
+										title="Only as new as the package lists"
+									>
+										(lists)</span
+									>{/if}{/if}</td
+						>
+						<td class:warn={v.security > 0}>{v.security < 0 ? '?' : v.security}</td>
+						<td class:warn={v.rebootRequired === true}
+							>{v.rebootRequired === null ? '?' : v.rebootRequired ? 'needed' : 'no'}</td
+						>
+						<td class="muted">{ago(o.at)}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	{/if}
 </header>
 
 {#if !local.connected && desktop}
@@ -485,7 +544,7 @@ nepfleet control token</code
 	{:else}
 		<ul class="remotes">
 			{#each local.remotes as r (r.name)}
-				<li class="card">
+				<li class="card" id="machine-{r.name}">
 					<div class="row">
 						<div>
 							<strong>{r.name}</strong> <code class="muted">{r.address}</code>
@@ -589,8 +648,12 @@ nepfleet control token</code
 						<div class="host-updates" aria-label="Pending host updates on {r.name}">
 							{#if u.error}
 								<p class="error" role="alert">Host updates: {u.error}</p>
-							{:else if u.value}
-								<p role="status">{describeHostUpdates(u.value)}</p>
+							{/if}
+							{#if u.value}
+								<p role="status">
+									{describeHostUpdates(u.value)}
+									{#if u.at}<span class="muted">· checked {ago(u.at)}</span>{/if}
+								</p>
 								{#if (u.value.supported && u.value.pending > 0) || u.value.rebootRequired}
 									<p class="host-actions">
 										{#if u.value.supported && u.value.pending > 0}
@@ -852,6 +915,20 @@ nepfleet control token</code
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
+	}
+	.hosts {
+		border-collapse: collapse;
+		margin-top: 0.75rem;
+		font-size: 0.9rem;
+	}
+	.hosts th,
+	.hosts td {
+		text-align: left;
+		padding: 0.2rem 0.75rem 0.2rem 0;
+	}
+	.hosts .warn {
+		color: var(--warn);
+		font-weight: 600;
 	}
 	.host-updates p {
 		margin: 0.25rem 0;

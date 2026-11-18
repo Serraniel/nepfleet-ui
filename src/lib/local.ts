@@ -231,7 +231,7 @@ function isNewsItem(v: unknown): boolean {
 	);
 }
 
-function isHostUpdates(v: unknown): v is HostUpdates {
+export function isHostUpdates(v: unknown): v is HostUpdates {
 	if (typeof v !== 'object' || v === null) return false;
 	const h = v as Record<string, unknown>;
 	// The news is extra: malformed, it is dropped, not the answer.
