@@ -311,6 +311,27 @@ group('checkHostUpdates', () => {
 		);
 		expect(describeHostUpdates({ ...arch, os: 'gentoo', supported: false })).toContain('gentoo');
 	});
+	it("doesn't say up to date from package lists that may be old", () => {
+		const stale = {
+			...arch,
+			fresh: false,
+			rebootRequired: false,
+			listsFrom: '2026-11-10T08:00:00Z'
+		};
+		const none = describeHostUpdates({ ...stale, pending: 0 });
+		expect(none).toContain('No updates in the package lists from');
+		expect(none).toContain('may be out of date');
+		expect(none).not.toContain('Up to date');
+		expect(describeHostUpdates({ ...stale, listsFrom: undefined, pending: 0 })).toBe(
+			'No updates in the package lists; they may be out of date.'
+		);
+		expect(describeHostUpdates({ ...stale, pending: 2, security: -1 })).toContain(
+			'2 updates in the package lists from'
+		);
+		expect(describeHostUpdates({ ...arch, fresh: true, pending: 0, rebootRequired: false })).toBe(
+			'Up to date.'
+		);
+	});
 	it('keeps Arch news, and drops news with an odd link', async () => {
 		const item = {
 			title: 'Manual step',
