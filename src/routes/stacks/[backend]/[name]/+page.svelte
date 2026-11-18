@@ -129,7 +129,8 @@
 
 	// Taking updates: the plan and its apply use newer digests and the template
 	// source's current commit.
-	let takingUpdates = $state(false);
+	// ?take=updates (the Updates page's link) opens the page reviewing them.
+	let takingUpdates = $state(page.url.searchParams.get('take') === 'updates');
 	function reviewUpdates(on: boolean) {
 		takingUpdates = on;
 		void loadPlan();
