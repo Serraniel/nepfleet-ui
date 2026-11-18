@@ -74,8 +74,8 @@
 <header>
 	<h1>Updates</h1>
 	<p>
-		What the registries have for every stack's images. Take an update from the stack's page, where
-		it's reviewed like any change.
+		What the registries have for every stack's images. "Review and take…" opens the stack's plan
+		with the update, to apply like any change.
 	</p>
 </header>
 
@@ -132,6 +132,12 @@
 								</li>
 							{/each}
 						</ul>
+						<a
+							class="take"
+							href="/stacks/{encodeURIComponent(r.backend)}/{encodeURIComponent(
+								r.stack
+							)}?take=updates">Review and take…</a
+						>
 					{/if}
 				</li>
 			{/each}
