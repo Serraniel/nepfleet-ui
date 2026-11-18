@@ -210,6 +210,10 @@ export interface HostUpdates {
 	rebootRequired: boolean | null;
 	packages?: string[];
 	notes?: string[];
+	/** Asked of the mirrors just now; false: only as new as listsFrom. Absent from older servers. */
+	fresh?: boolean;
+	/** When the package lists were last refreshed, when not fresh. */
+	listsFrom?: string;
 	/** Arch: when the last full upgrade started. */
 	lastUpgrade?: string;
 	/** Arch news published since then: read before updating. */
@@ -271,10 +275,16 @@ export async function checkHostUpdates(
 /** One line for a machine's pending updates. */
 export function describeHostUpdates(h: HostUpdates): string {
 	if (!h.supported) return `NepFleet doesn't know how to check updates on ${h.os} yet.`;
+	// Not asked of the mirrors just now: only as new as the package lists.
+	const stale = h.fresh === false;
+	const from = h.listsFrom ? ` from ${new Date(h.listsFrom).toLocaleDateString()}` : '';
 	const parts = [
 		h.pending === 0
-			? 'Up to date'
+			? stale
+				? `No updates in the package lists${from}; they may be out of date`
+				: 'Up to date'
 			: `${h.pending} update${h.pending === 1 ? '' : 's'}` +
+				(stale ? ` in the package lists${from}` : '') +
 				(h.security > 0
 					? ` (${h.security} security fix${h.security === 1 ? '' : 'es'})`
 					: h.security === 0
