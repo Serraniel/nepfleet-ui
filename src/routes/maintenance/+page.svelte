@@ -74,7 +74,10 @@
 			{:else if st.state === 'error'}
 				<p class="error" role="alert">{st.error}</p>
 			{:else if st.value.length === 0}
-				<p class="muted">This fleet has no Uptime Kuma in fleet.yaml.</p>
+				<p class="muted">
+					No Uptime Kuma on this backend's host: set one up from <a href="/features">Features</a>,
+					or name one elsewhere in fleet.yaml (<code>spec.uptimeKuma</code>).
+				</p>
 			{:else}
 				{#each st.value as k (k.kuma)}
 					{@const shown = sorted(k)}
