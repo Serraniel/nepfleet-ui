@@ -34,6 +34,7 @@
 	import Containers from '#lib/Containers.svelte';
 	import Restore from '#lib/Restore.svelte';
 	import SBOMButton from '#lib/SBOMButton.svelte';
+	import StackInputs from '#lib/StackInputs.svelte';
 	import TemplateMatch from '#lib/TemplateMatch.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
@@ -319,6 +320,7 @@
 	>
 	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
+{#if backend && token}<StackInputs {backend} {token} stack={name} onSaved={loadPlan} />{/if}
 {#if places.length}
 	<ul class="places" aria-label="Open elsewhere">
 		{#each places as place (place.url)}
