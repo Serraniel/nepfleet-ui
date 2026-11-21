@@ -6,7 +6,9 @@
 	 * shows that something happens.
 	 */
 	let { step, steps, text }: { step: number; steps: number; text: string } = $props();
-	const pct = $derived(steps > 0 ? Math.min(100, Math.max(0, (step / steps) * 100)) : 0);
+	// Step n runs, so n - 1 are done: the bar fills to halfway through step n
+	// and is full only when the job ends (it's no longer shown then).
+	const pct = $derived(steps > 0 ? Math.min(100, Math.max(0, ((step - 0.5) / steps) * 100)) : 0);
 </script>
 
 <div class="progress">
@@ -15,7 +17,7 @@
 		role="progressbar"
 		aria-valuemin={0}
 		aria-valuemax={steps}
-		aria-valuenow={step}
+		aria-valuenow={step - 1}
 		aria-valuetext="Step {step} of {steps}: {text}"
 		aria-label="Step {step} of {steps}: {text}"
 	>

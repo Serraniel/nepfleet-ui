@@ -886,7 +886,7 @@ nepfleet control token</code
 	{/if}
 	{#if setupError}<p class="error" role="alert">{setupError}</p>{/if}
 	{#snippet actions()}
-		<Button variant="ghost" onclick={() => (setupOpen = false)}>
+		<Button onclick={() => (setupOpen = false)}>
 			{setupRunning ? 'Close (it keeps running)' : 'Close'}
 		</Button>
 		{#if setupFor && !setupKind(setupFor.report) && setupJob?.state === 'succeeded'}
