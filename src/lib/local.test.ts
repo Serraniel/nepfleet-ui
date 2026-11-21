@@ -23,6 +23,7 @@ import {
 	runDoctor,
 	checkHostUpdates,
 	describeHostUpdates,
+	hostUpdateOffer,
 	updateOffer,
 	daemonOutdated,
 	fetchDaemonInfo,
@@ -302,6 +303,15 @@ group('checkHostUpdates', () => {
 		rebootRequired: true,
 		packages: ['linux', 'openssl']
 	};
+	it('offers to update also when the lists may be out of date', () => {
+		expect(hostUpdateOffer(arch)).toBe('Update the host…');
+		expect(hostUpdateOffer({ ...arch, pending: 0, fresh: false })).toBe(
+			'Refresh and update the host…'
+		);
+		expect(hostUpdateOffer({ ...arch, pending: 0, fresh: true })).toBeNull();
+		expect(hostUpdateOffer({ ...arch, pending: 0 })).toBeNull();
+		expect(hostUpdateOffer({ ...arch, supported: false })).toBeNull();
+	});
 	it('returns and describes the answer', async () => {
 		const h = await checkHostUpdates('http://127.0.0.1:7481', 'nfc_x', 'vps', answering(arch));
 		expect(h).toEqual(arch);
