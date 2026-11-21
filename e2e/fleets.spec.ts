@@ -294,3 +294,85 @@ test('rolling back: refused while destructive, then only with the name typed', a
 	await expect(page.getByText('Rolled back.', { exact: true })).toBeVisible();
 	expect(mock.rollbacks).toEqual([false, true]);
 });
+
+test('a setup that needed a key unlocked plans the same kind again', async ({ page }) => {
+	const kinds: string[] = [];
+	let unlocked = false;
+	await page.route(DAEMON + '/**', async (route: Route) => {
+		const req = route.request();
+		const cors = {
+			'Access-Control-Allow-Origin': new URL(page.url()).origin,
+			'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+			'Access-Control-Allow-Methods': 'GET, POST, DELETE'
+		};
+		if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+		const url = new URL(req.url());
+		const json = (status: number, body: unknown) =>
+			route.fulfill({
+				status,
+				headers: cors,
+				contentType: 'application/json',
+				body: JSON.stringify(body)
+			});
+		if (url.pathname === '/v1/info')
+			return json(200, { version: 'edge', commit: 'abc1234', pid: 1 });
+		if (url.pathname === '/v1/events') return json(200, { events: [], unread: 0, seen: 0 });
+		if (url.pathname === '/v1/remotes')
+			return json(200, [
+				{
+					name: 'vps',
+					address: 'ssh://me@vps',
+					tunnel: 'off',
+					report: {
+						kernel: 'Linux',
+						os: 'Arch Linux',
+						arch: 'x86_64',
+						docker: true,
+						dockerRunning: true,
+						compose: true,
+						nepfleetRunning: true,
+						nepfleetImage: 'ghcr.io/serraniel/nepfleet:edge@sha256:' + 'a'.repeat(64)
+					}
+				}
+			]);
+		if (url.pathname === '/v1/keys/unlock') {
+			unlocked = true;
+			return route.fulfill({ status: 204, headers: cors });
+		}
+		if (url.pathname === '/v1/remotes/vps/setup' && req.method() === 'GET') {
+			const kind = url.searchParams.get('kind') ?? '';
+			kinds.push(kind);
+			if (!unlocked)
+				return json(502, {
+					error: 'SSH refused the login, and your key has a passphrase',
+					lockedKeys: ['/home/me/.ssh/id_rsa']
+				});
+			return json(200, {
+				kind,
+				id: 'plan-1',
+				steps: [{ text: 'keep the current compose.yaml', root: false }]
+			});
+		}
+		return json(404, { error: 'not here' });
+	});
+	await page.addInitScript(
+		([u, t]) => {
+			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
+				invoke: async (cmd: string) => {
+					if (cmd === 'control_start') return { url: u, token: t };
+					if (cmd === 'nepfleet_version') return 'nepfleet edge (abc1234)';
+					throw new Error('unexpected command ' + cmd);
+				}
+			};
+		},
+		[DAEMON, TOKEN]
+	);
+	await page.goto('/fleets');
+	await page.getByRole('button', { name: 'Update NepFleet to edge…' }).click();
+	await page.getByLabel('Passphrase').fill('secret');
+	await page.getByRole('button', { name: 'Unlock' }).click();
+
+	const dialog = page.getByRole('dialog', { name: 'Update NepFleet on vps' });
+	await expect(dialog).toContainText('keep the current compose.yaml');
+	expect(kinds).toEqual(['update', 'update']);
+});
