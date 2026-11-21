@@ -11,12 +11,13 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 	const seen: string[] = [];
 	let seenId = 0;
 	const rollbacks: boolean[] = [];
+	const inputsSaved: Record<string, string>[] = [];
 	await page.route(DAEMON + '/**', async (route: Route) => {
 		const req = route.request();
 		const cors = {
 			'Access-Control-Allow-Origin': new URL(page.url()).origin,
 			'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-			'Access-Control-Allow-Methods': 'GET, POST, DELETE'
+			'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE'
 		};
 		if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
 		const path = new URL(req.url()).pathname;
@@ -70,6 +71,39 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 			seenId = (req.postDataJSON() as { id: number }).id;
 			return route.fulfill({ status: 204, headers: cors });
 		}
+		if (path === '/v1/remotes/nas/api/v1/stacks/photos/inputs' && req.method() === 'GET')
+			return json(200, {
+				inputs: [
+					{
+						name: 'DOMAIN',
+						type: 'hostname',
+						title: 'Domain',
+						required: true,
+						set: true,
+						value: 'photos.example.test'
+					},
+					{
+						name: 'ADMIN_EMAIL',
+						type: 'email',
+						title: 'Admin e-mail',
+						required: true,
+						missing: !inputsSaved.length
+					},
+					{
+						name: 'ADMIN_PASSWORD',
+						type: 'secret',
+						title: 'Admin password',
+						required: true,
+						secret: true,
+						missing: !inputsSaved.length,
+						set: inputsSaved.length > 0
+					}
+				]
+			});
+		if (path === '/v1/remotes/nas/api/v1/stacks/photos/inputs' && req.method() === 'PUT') {
+			inputsSaved.push((req.postDataJSON() as { values: Record<string, string> }).values);
+			return json(200, { commit: 'c'.repeat(40) });
+		}
 		if (path === '/v1/remotes/nas/api/v1/stacks/photos/plan')
 			return json(200, { id: 'p', stack: 'photos', mode: 'compose', first: false, changes: null });
 		if (path === '/v1/remotes/nas/api/v1/stacks/photos/history')
@@ -98,7 +132,7 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 		}
 		return json(404, { error: 'not here' });
 	});
-	return Object.assign(seen, { rollbacks });
+	return Object.assign(seen, { rollbacks, inputsSaved });
 }
 
 test('adds a machine, connects it, and its stacks show up', async ({ page }) => {
@@ -375,4 +409,30 @@ test('a setup that needed a key unlocked plans the same kind again', async ({ pa
 	const dialog = page.getByRole('dialog', { name: 'Update NepFleet on vps' });
 	await expect(dialog).toContainText('keep the current compose.yaml');
 	expect(kinds).toEqual(['update', 'update']);
+});
+
+test('a stack that waits for values asks for them, and saves them in one go', async ({ page }) => {
+	const mock = await mockDaemon(page);
+	await page.goto('/fleets');
+	await page.getByLabel('Daemon address').fill(DAEMON);
+	await page.getByLabel('Token').fill(TOKEN);
+	await page.getByRole('button', { name: 'Connect' }).click();
+	await page.getByLabel('SSH address').fill('ssh://me@nas');
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
+	await page.getByRole('button', { name: 'Connect' }).click();
+	await page.getByRole('link', { name: 'Stacks', exact: true }).first().click();
+	await page.getByRole('link', { name: 'photos' }).click();
+
+	await expect(page.getByRole('heading', { name: 'Needs values' })).toBeVisible();
+	const save = page.getByRole('button', { name: 'Save' });
+	await expect(save).toBeDisabled();
+	await page.getByLabel(/Admin e-mail/).fill('admin@example.test');
+	await page.getByLabel(/Admin password/).fill('long-enough-1');
+	await save.click();
+	await expect(page.getByText(/Saved ADMIN_EMAIL, ADMIN_PASSWORD in ccccccc/)).toBeVisible();
+	expect(mock.inputsSaved).toEqual([
+		{ ADMIN_EMAIL: 'admin@example.test', ADMIN_PASSWORD: 'long-enough-1' }
+	]);
+	// Nothing is missing any more: the section is plain settings again.
+	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 });

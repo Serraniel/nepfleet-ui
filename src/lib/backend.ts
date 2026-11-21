@@ -1122,6 +1122,101 @@ export async function setSecret(
 	return o.commit;
 }
 
+/** One input of a stack's template, and whether it's set (GET …/inputs). */
+export interface StackInput {
+	name: string;
+	type: string;
+	title?: string;
+	description?: string;
+	required?: boolean;
+	default?: string;
+	options?: string[];
+	pattern?: string;
+	/** Kept encrypted: written, never read back. */
+	secret?: boolean;
+	set?: boolean;
+	/** The current value; never for secret inputs. */
+	value?: string;
+	/** Required, no default, and not set: the stack waits for it. */
+	missing?: boolean;
+}
+
+function isStackInputs(v: unknown): v is { inputs: StackInput[] } {
+	const o = v as { inputs?: unknown } | null;
+	return (
+		typeof o === 'object' &&
+		o !== null &&
+		Array.isArray(o.inputs) &&
+		o.inputs.every(
+			(i: unknown) =>
+				typeof i === 'object' &&
+				i !== null &&
+				typeof (i as StackInput).name === 'string' &&
+				typeof (i as StackInput).type === 'string'
+		)
+	);
+}
+
+/** The inputs of a stack's template; [] for a stack without a template. */
+export function fetchStackInputs(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<StackInput[]> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/inputs`,
+		isStackInputs,
+		fetcher,
+		timeoutMs
+	).then((o) => o.inputs);
+}
+
+/**
+ * Sets several inputs in one commit: secret ones encrypted, the others in
+ * stack.yaml. An empty value leaves an input as it is. The backend waits up to
+ * 2 minutes for a running apply. Throws VerifyFirstError when a person must
+ * confirm with a passkey first.
+ */
+export async function setStackInputs(
+	backend: Backend,
+	token: string,
+	stack: string,
+	values: Record<string, string>,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 150000
+): Promise<string> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}/inputs`, {
+		method: 'PUT',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify({ values })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError(
+			'This token may not change the stack. That needs one with the edit scope.'
+		);
+	}
+	if (res.status === 404) throw new NotFoundError('No such stack');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown };
+	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
+	return o.commit;
+}
+
 /** An opt-in system stack, as nepfleet enable lists it (GET /api/v1/features). */
 export interface Feature {
 	name: string;
