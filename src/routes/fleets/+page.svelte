@@ -296,13 +296,18 @@
 		setupAsked = kind ?? null;
 		setupPlan = null;
 		setupError = '';
-		if (!kind) return;
+		if (!kind) {
+			setupError = `There's nothing to set up on ${r.name}: NepFleet runs there already.`;
+			return;
+		}
 		planning = true;
 		try {
 			setupPlan = await fetchSetupPlan(local.url, local.token, r.name, kind);
 		} catch (e) {
 			if (e instanceof LockedKeyError) {
-				askUnlock(e.keys, () => planSetup(r));
+				// Shown if the unlock is cancelled; planning again replaces it.
+				setupError = e.message;
+				askUnlock(e.keys, () => planSetup(r, kind));
 				return;
 			}
 			setupError = e instanceof Error ? e.message : String(e);
