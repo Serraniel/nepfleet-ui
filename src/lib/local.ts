@@ -372,15 +372,43 @@ export function updateOffer(
 	return null;
 }
 
-/** The control daemon's version, as GET /v1/info says. */
-export async function fetchDaemonVersion(
+/** A nepfleet build: its version, and the commit it was built from ('' unknown). */
+export interface Build {
+	version: string;
+	commit: string;
+}
+
+/** The running control daemon's build, as GET /v1/info says. */
+export async function fetchDaemonInfo(
 	daemon: string,
 	token: string,
 	fetcher: typeof fetch = fetch
-): Promise<string> {
-	const data = await call(daemon, token, 'GET', '/v1/info', undefined, fetcher, 10000);
-	const v = (data as { version?: unknown } | undefined)?.version;
-	return typeof v === 'string' ? v : '';
+): Promise<Build> {
+	const data = (await call(daemon, token, 'GET', '/v1/info', undefined, fetcher, 10000)) as
+		{ version?: unknown; commit?: unknown } | undefined;
+	const str = (v: unknown) => (typeof v === 'string' ? v : '');
+	return { version: str(data?.version), commit: str(data?.commit) };
+}
+
+/** Reads `nepfleet version` output: "nepfleet 0.4.0 (abc123)". */
+export function parseVersionOutput(out: string): Build | null {
+	const m = /^nepfleet (\S+) \(([^)]*)\)/.exec(out.trim());
+	const [, version, commit] = m ?? [];
+	if (version === undefined || commit === undefined) return null;
+	return { version, commit: commit === 'unknown' ? '' : commit };
+}
+
+/**
+ * Whether the installed nepfleet is another build than the running daemon, so
+ * restarting the daemon would run it. Edge builds share the version "edge" and
+ * differ by commit; a daemon that reports no commit predates restarting from
+ * the app, and an installed build with a commit is newer than it.
+ */
+export function daemonOutdated(running: Build, installed: Build | null): boolean {
+	if (!installed || !running.version) return false;
+	if (installed.version !== running.version) return true;
+	if (!installed.commit) return false;
+	return running.commit !== installed.commit;
 }
 
 /** One step of a setup; root steps run as root over SSH. */

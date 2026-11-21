@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AuthError, type Backend } from './backend.ts';
 import { backends } from './backends.svelte.ts';
-import { isDesktop, startDaemon } from './desktop.ts';
+import { installedVersion, isDesktop, restartDaemon, startDaemon } from './desktop.ts';
 import {
+	type Build,
 	type Remote,
-	fetchDaemonVersion,
+	daemonOutdated,
+	fetchDaemonInfo,
+	parseVersionOutput,
 	fetchEvents,
 	fetchRemotes,
 	markSeen,
@@ -19,6 +22,8 @@ const TOKEN_KEY = 'nepfleet-control-token';
 const KEEP_EVENTS = 500;
 /** How often the desktop app tries to start a daemon that stopped. */
 const RESTART_EVERY_MS = 30_000;
+/** How often the desktop app asks which nepfleet is installed. */
+const INSTALLED_EVERY_MS = 60_000;
 
 /** No answer at all: nothing listens, or it hangs. Not an HTTP error. */
 export function unreachable(e: unknown): boolean {
@@ -39,6 +44,14 @@ class Local {
 	remotes = $state<Remote[]>([]);
 	/** The daemon's version: machines running an older NepFleet can update to it. */
 	version = $state('');
+	/** The commit the daemon was built from, '' when it doesn't say. */
+	commit = $state('');
+	/** The nepfleet installed now (desktop app only): another build after an update. */
+	installed = $state<Build | null>(null);
+	/** The daemon is being restarted on request; restartError says why it failed. */
+	restartingDaemon = $state(false);
+	restartError = $state('');
+	#installedChecked = 0;
 	error = $state('');
 	events = $state<FleetEvent[]>([]);
 	unread = $state(0);
@@ -60,6 +73,38 @@ class Local {
 
 	get connected() {
 		return this.token !== '';
+	}
+
+	/** nepfleet was updated while the daemon kept running the old binary. */
+	get outdated() {
+		return daemonOutdated({ version: this.version, commit: this.commit }, this.installed);
+	}
+
+	/**
+	 * Restarts the daemon with the nepfleet installed now, through the desktop
+	 * app. Tunnels come back by themselves; a running setup makes it refuse.
+	 */
+	async restartDaemon() {
+		if (!isDesktop() || this.restartingDaemon) return;
+		this.restartingDaemon = true;
+		this.restartError = '';
+		try {
+			const d = await restartDaemon();
+			this.version = '';
+			this.commit = '';
+			this.#installedChecked = 0;
+			await this.connect(d.url, d.token, false);
+		} catch (e) {
+			this.restartError = e instanceof Error ? e.message : String(e);
+		} finally {
+			this.restartingDaemon = false;
+		}
+	}
+
+	private async checkInstalled() {
+		if (!isDesktop() || Date.now() - this.#installedChecked < INSTALLED_EVERY_MS) return;
+		this.#installedChecked = Date.now();
+		this.installed = parseVersionOutput(await installedVersion().catch(() => ''));
 	}
 
 	/** Remembers the daemon and starts following it. Throws on a bad address. */
@@ -101,8 +146,12 @@ class Local {
 			this.remotes = await fetchRemotes(this.url, this.token);
 			this.error = '';
 			this.daemonDown = false;
-			if (!this.version)
-				this.version = await fetchDaemonVersion(this.url, this.token).catch(() => '');
+			if (!this.version) {
+				const info = await fetchDaemonInfo(this.url, this.token).catch(() => null);
+				this.version = info?.version ?? '';
+				this.commit = info?.commit ?? '';
+			}
+			void this.checkInstalled();
 			this.sync();
 			await this.refreshEvents();
 		} catch (e) {
@@ -121,6 +170,9 @@ class Local {
 		this.daemonDown = true;
 		this.error = '';
 		this.remotes = [];
+		// The daemon that starts next may be another build.
+		this.version = '';
+		this.commit = '';
 		this.sync();
 		void this.restart();
 	}
