@@ -100,7 +100,10 @@ describe('stackPlaces', () => {
 				url: 'https://web.example.org',
 				links: [{ name: 'Logs in Dozzle', url: 'https://logs.example.org/stack/web' }]
 			}).map((l) => l.name)
-		).toEqual(['Open', 'Logs in Dozzle']);
+		).toEqual(['Open web.example.org', 'Logs in Dozzle']);
+		expect(stackPlaces({ ...stack, url: 'https://example.org/wiki/' })[0]?.name).toBe(
+			'Open example.org/wiki/'
+		);
 		expect(stackPlaces(stack)).toEqual([]);
 	});
 	it('keeps out what could run in this page', () => {
