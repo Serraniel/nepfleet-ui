@@ -10,3 +10,18 @@ export async function startDaemon(): Promise<{ url: string; token: string }> {
 	const { invoke } = await import('@tauri-apps/api/core');
 	return invoke('control_start');
 }
+
+/**
+ * Stops the daemon and starts the nepfleet installed now, through the desktop
+ * app, and says how to reach the new one. Refused while a setup runs.
+ */
+export async function restartDaemon(): Promise<{ url: string; token: string }> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	return invoke('control_restart');
+}
+
+/** What `nepfleet version` says about the installed binary. */
+export async function installedVersion(): Promise<string> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	return invoke('nepfleet_version');
+}

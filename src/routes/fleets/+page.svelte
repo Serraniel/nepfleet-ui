@@ -487,11 +487,33 @@ nepfleet control token</code
 	</section>
 {:else}
 	<div class="row">
-		<p class="muted">Control daemon at <code>{local.url}</code></p>
-		{#if !desktop}
+		<p class="muted">
+			Control daemon at <code>{local.url}</code>{#if local.version}, NepFleet {local.version}{#if local.commit}
+					<code title={local.commit}>{local.commit.slice(0, 7)}</code>{/if}{/if}
+		</p>
+		{#if desktop}
+			<Button
+				variant="ghost"
+				busy={local.restartingDaemon}
+				onclick={() => local.restartDaemon()}
+				title="Stop the daemon and start the nepfleet installed now. Tunnels come back by themselves."
+				>{local.restartingDaemon ? 'Restarting…' : 'Restart the daemon'}</Button
+			>
+		{:else}
 			<Button variant="ghost" onclick={() => local.disconnect()}>Forget token</Button>
 		{/if}
 	</div>
+	{#if desktop && local.outdated && local.installed}
+		<p class="notice" role="status">
+			NepFleet was updated to {local.installed.version}{#if local.installed.commit}
+				({local.installed.commit.slice(0, 7)}){/if}, but the daemon still runs the build it started
+			with. Restart it to use the new one.
+			<Button variant="primary" busy={local.restartingDaemon} onclick={() => local.restartDaemon()}
+				>Restart the daemon</Button
+			>
+		</p>
+	{/if}
+	{#if local.restartError}<p class="error" role="alert">{local.restartError}</p>{/if}
 	{#if local.error}<p class="error" role="alert">{local.error}</p>{/if}
 
 	<section class="card" aria-labelledby="fleetdir-h">
@@ -960,6 +982,16 @@ nepfleet control token</code
 	}
 	.error {
 		color: var(--err);
+	}
+	.notice {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: calc(var(--radius) + 4px);
+		padding: 0.7rem 1rem;
 	}
 	.card {
 		background: var(--surface);

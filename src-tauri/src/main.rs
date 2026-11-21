@@ -68,6 +68,22 @@ fn control_start() -> Result<Daemon, String> {
     })
 }
 
+/// Stops the running daemon and starts the nepfleet installed now (after an
+/// update), then turns on its port again. It refuses while a setup runs.
+/// Async, so the window stays responsive while the daemon stops and starts.
+#[tauri::command]
+async fn control_restart() -> Result<Daemon, String> {
+    run(&["control", "restart"])?;
+    control_start()
+}
+
+/// What `nepfleet version` says about the installed binary, e.g.
+/// "nepfleet edge (54300e9…)": the frontend compares it with the running daemon.
+#[tauri::command]
+async fn nepfleet_version() -> Result<String, String> {
+    run(&["version"])
+}
+
 /// Brings the window back: from the tray, or when the app is started again.
 fn show(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -130,7 +146,11 @@ fn main() {
                 api.prevent_close();
             }
         })
-        .invoke_handler(tauri::generate_handler![control_start])
+        .invoke_handler(tauri::generate_handler![
+            control_start,
+            control_restart,
+            nepfleet_version
+        ])
         .run(tauri::generate_context!())
         .expect("the NepFleet window failed to start");
 }

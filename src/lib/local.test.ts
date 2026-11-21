@@ -23,7 +23,10 @@ import {
 	runDoctor,
 	checkHostUpdates,
 	describeHostUpdates,
-	updateOffer
+	updateOffer,
+	daemonOutdated,
+	fetchDaemonInfo,
+	parseVersionOutput
 } from './local.ts';
 
 const daemon = 'http://127.0.0.1:7481';
@@ -425,5 +428,45 @@ group('updateOffer', () => {
 		expect(updateOffer(at('0.3.1'), 'v0.4.0-dev')).toBeNull();
 		expect(updateOffer(undefined, 'v0.4.0')).toBeNull();
 		expect(updateOffer(at('0.3.1'), '')).toBeNull();
+	});
+});
+
+group('daemon restart after an update', () => {
+	it('reads the daemon build', async () => {
+		const f = fake(200, { version: 'edge', commit: 'abc1234', pid: 1 });
+		expect(await fetchDaemonInfo(daemon, 'nfc_x', f.fetcher)).toEqual({
+			version: 'edge',
+			commit: 'abc1234'
+		});
+		const old = fake(200, { version: '0.3.4', pid: 1 });
+		expect(await fetchDaemonInfo(daemon, 'nfc_x', old.fetcher)).toEqual({
+			version: '0.3.4',
+			commit: ''
+		});
+	});
+
+	it('reads nepfleet version', () => {
+		expect(parseVersionOutput('nepfleet edge (54300e9663c7)\n')).toEqual({
+			version: 'edge',
+			commit: '54300e9663c7'
+		});
+		expect(parseVersionOutput('nepfleet dev (unknown)')).toEqual({ version: 'dev', commit: '' });
+		expect(parseVersionOutput('')).toBeNull();
+		expect(parseVersionOutput('command not found')).toBeNull();
+	});
+
+	it('says when the installed build differs from the running one', () => {
+		const edge = (commit: string) => ({ version: 'edge', commit });
+		expect(daemonOutdated(edge('a'), edge('a'))).toBe(false);
+		expect(daemonOutdated(edge('a'), edge('b'))).toBe(true);
+		// A daemon from before it reported its commit: the installed one is newer.
+		expect(daemonOutdated(edge(''), edge('b'))).toBe(true);
+		expect(
+			daemonOutdated({ version: '0.3.4', commit: 'x' }, { version: '0.4.0', commit: 'y' })
+		).toBe(true);
+		// Nothing to compare: no banner.
+		expect(daemonOutdated(edge('a'), null)).toBe(false);
+		expect(daemonOutdated({ version: '', commit: '' }, edge('b'))).toBe(false);
+		expect(daemonOutdated(edge('a'), edge(''))).toBe(false);
 	});
 });
