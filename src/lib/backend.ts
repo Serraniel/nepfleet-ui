@@ -121,12 +121,23 @@ export function stackRelations(
 	};
 }
 
+/** "Open" with the stack's address, so its domain shows: "Open vault.example.org". */
+function openName(url: string): string {
+	try {
+		const u = new URL(url);
+		const path = u.pathname === '/' ? '' : u.pathname;
+		return `Open ${u.host}${path}`;
+	} catch {
+		return 'Open';
+	}
+}
+
 /**
  * Where a stack can be opened. A backend's answer goes into an href, so only web
  * addresses count: a javascript: link would run in this page.
  */
 export function stackPlaces(s: StackInfo): StackLink[] {
-	const all = [...(s.url ? [{ name: 'Open', url: s.url }] : []), ...(s.links ?? [])];
+	const all = [...(s.url ? [{ name: openName(s.url), url: s.url }] : []), ...(s.links ?? [])];
 	return all.filter((l) => {
 		if (typeof l?.name !== 'string' || typeof l?.url !== 'string') return false;
 		try {
