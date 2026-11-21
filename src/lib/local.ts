@@ -295,6 +295,18 @@ export function describeHostUpdates(h: HostUpdates): string {
 	return parts.join(', ') + '.';
 }
 
+/**
+ * Whether to offer updating the host, and how to name it: also when the lists
+ * may be out of date, as the update refreshes them first and installs what
+ * is pending then (on Arch it also brings the checkers that answer fresh).
+ */
+export function hostUpdateOffer(h: HostUpdates): string | null {
+	if (!h.supported) return null;
+	if (h.pending > 0) return 'Update the host…';
+	if (h.fresh === false) return 'Refresh and update the host…';
+	return null;
+}
+
 export async function remoteAction(
 	daemon: string,
 	token: string,

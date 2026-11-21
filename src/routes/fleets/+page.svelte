@@ -25,6 +25,7 @@
 		type DoctorCheck,
 		checkHostUpdates,
 		describeHostUpdates,
+		hostUpdateOffer,
 		type HostUpdates,
 		updateOffer
 	} from '#lib/local.ts';
@@ -676,14 +677,15 @@ nepfleet control token</code
 									{describeHostUpdates(u.value)}
 									{#if u.at}<span class="muted">· checked {ago(u.at)}</span>{/if}
 								</p>
-								{#if (u.value.supported && u.value.pending > 0) || u.value.rebootRequired}
+								{@const offer = hostUpdateOffer(u.value)}
+								{#if offer || u.value.rebootRequired}
 									<p class="host-actions">
-										{#if u.value.supported && u.value.pending > 0}
+										{#if offer}
 											<Button
 												onclick={() => openSetup(r, 'host-update')}
 												disabled={!!busy[r.name]}
-												title="Plans the update for you to review; nothing runs until you start it"
-												>Update the host…</Button
+												title="Plans the update for you to review; nothing runs until you start it. It refreshes the package lists first."
+												>{offer}</Button
 											>
 										{/if}
 										{#if u.value.rebootRequired}
