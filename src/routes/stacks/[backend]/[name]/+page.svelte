@@ -310,6 +310,10 @@
 <p>
 	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit">Edit files</a>
 	·
+	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit#secrets-h-{name}"
+		>Secrets</a
+	>
+	·
 	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/rendered"
 		>Rendered files</a
 	>
