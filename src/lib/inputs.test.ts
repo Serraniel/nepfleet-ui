@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { checkInput, helpText, newCommand, shellQuote } from './inputs.ts';
+import {
+	checkInput,
+	groupInputs,
+	helpText,
+	newCommand,
+	shellQuote,
+	splitInputs
+} from './inputs.ts';
 
 describe('checkInput', () => {
 	it('follows the backend rules', () => {
@@ -68,5 +75,36 @@ describe('helpText', () => {
 	});
 	it("ignores keys that aren't the template's own", () => {
 		expect(helpText(token, inputs, { PROVIDER: 'toString' })).toBe('a token');
+	});
+});
+
+describe('splitInputs', () => {
+	const inp = (name: string, required = false, def?: string) => ({ name, required, default: def });
+	it('puts inputs without a default first, the rest grouped by prefix', () => {
+		const { required, optional } = splitInputs([
+			inp('OIDC_ISSUER'),
+			inp('DOMAIN', true),
+			inp('TZ', false, 'UTC'),
+			inp('OIDC_CLIENT_ID'),
+			inp('ADMIN_EMAIL', true),
+			inp('MODE', true, 'a'),
+			inp('SMTP_HOST'),
+			inp('LOG_LEVEL', false, 'info')
+		]);
+		expect(required.map((i) => i.name)).toEqual(['DOMAIN', 'ADMIN_EMAIL']);
+		expect(optional.map((g) => [g.prefix, g.inputs.map((i) => i.name)])).toEqual([
+			['OIDC', ['OIDC_ISSUER', 'OIDC_CLIENT_ID']],
+			['', ['TZ']],
+			['', ['MODE']],
+			['', ['SMTP_HOST']], // a prefix of one is no group
+			['', ['LOG_LEVEL']]
+		]);
+	});
+	it('keeps names without an underscore, or starting with one, on their own', () => {
+		expect(groupInputs([inp('_A'), inp('_B'), inp('A')]).map((g) => g.prefix)).toEqual([
+			'',
+			'',
+			''
+		]);
 	});
 });

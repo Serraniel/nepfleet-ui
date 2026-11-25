@@ -435,4 +435,5 @@ test('a stack that waits for values asks for them, and saves them in one go', as
 	]);
 	// Nothing is missing any more: the section is plain settings again.
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+	await expect(page.getByText('Change settings (3)')).toBeVisible();
 });

@@ -33,6 +33,75 @@ export function helpText(
 	return inp.description ?? '';
 }
 
+/** What ordering needs from an input; fits template and stack inputs. */
+interface Orderable {
+	name: string;
+	required?: boolean;
+	default?: string;
+}
+
+/** Required without a default: nothing applies unless the user fills it. */
+export function needsValue(i: Orderable): boolean {
+	return !!i.required && !i.default;
+}
+
+/** Inputs shown together; prefix is '' for an input on its own. */
+export interface InputGroup<T> {
+	prefix: string;
+	inputs: T[];
+}
+
+/** The name up to the first underscore: OIDC for OIDC_ISSUER. */
+function prefixOf(name: string): string {
+	const at = name.indexOf('_');
+	return at > 0 ? name.slice(0, at) : '';
+}
+
+/**
+ * Groups inputs that share a name prefix (OIDC_*, SMTP_*), so related
+ * fields stay together. A prefix only forms a group when 2+ inputs share
+ * it; the group takes the place of its first member, the rest keep the
+ * template's order. Templates have no group hint yet, so the prefix is
+ * the best guess.
+ */
+export function groupInputs<T extends Orderable>(inputs: T[]): InputGroup<T>[] {
+	const count = new Map<string, number>();
+	for (const i of inputs) {
+		const p = prefixOf(i.name);
+		if (p) count.set(p, (count.get(p) ?? 0) + 1);
+	}
+	const out: InputGroup<T>[] = [];
+	const byPrefix = new Map<string, InputGroup<T>>();
+	for (const i of inputs) {
+		const p = prefixOf(i.name);
+		if (!p || (count.get(p) ?? 0) < 2) {
+			out.push({ prefix: '', inputs: [i] });
+			continue;
+		}
+		let g = byPrefix.get(p);
+		if (!g) {
+			g = { prefix: p, inputs: [] };
+			byPrefix.set(p, g);
+			out.push(g);
+		}
+		g.inputs.push(i);
+	}
+	return out;
+}
+
+/**
+ * Splits a form's inputs: the ones that need a value first, in template
+ * order; the rest (a default, or optional) grouped by prefix.
+ */
+export function splitInputs<T extends Orderable>(
+	inputs: T[]
+): { required: T[]; optional: InputGroup<T>[] } {
+	return {
+		required: inputs.filter(needsValue),
+		optional: groupInputs(inputs.filter((i) => !needsValue(i)))
+	};
+}
+
 // The same rules as nepfleet's render.CheckInput, so the wizard and the
 // backend agree on what is valid.
 const HOSTNAME = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;

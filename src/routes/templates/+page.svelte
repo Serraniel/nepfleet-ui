@@ -17,7 +17,9 @@
 		type TemplateInput,
 		checkInput,
 		helpText,
-		newCommand
+		needsValue,
+		newCommand,
+		splitInputs
 	} from '#lib/inputs.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -126,7 +128,9 @@
 		picked = e;
 		stackName = e.t.name;
 		target = 'local';
-		values = Object.fromEntries((e.t.inputs ?? []).map((i) => [i.name, i.default ?? '']));
+		// Empty, not the default: the field shows the default as its
+		// placeholder, and an unset input takes it on the backend.
+		values = Object.fromEntries((e.t.inputs ?? []).map((i) => [i.name, '']));
 		secretValues = {};
 		access = 'domain';
 		createError = '';
@@ -138,6 +142,7 @@
 	});
 
 	const inputs = $derived(picked?.t.inputs ?? []);
+	const split = $derived(splitInputs(inputs));
 	const errors = $derived(
 		Object.fromEntries(
 			inputs
@@ -214,6 +219,60 @@
 	};
 </script>
 
+{#snippet field(inp: TemplateInput)}
+	{#if inp.type !== 'secret'}
+		{@const err = errors[inp.name]}
+		<div class="field">
+			<label for="f-{inp.name}">
+				{inp.title ?? inp.name}{#if needsValue(inp)}<span aria-hidden="true"> * </span>{/if}
+			</label>
+			{#if inp.type === 'enum' || inp.type === 'bool' || inp.type === 'gpu'}
+				<select id="f-{inp.name}" bind:value={values[inp.name]}>
+					{#if !inp.required || TYPED.has(inp.type)}<option value="">
+							{inp.default ? `(default: ${inp.default})` : '(default)'}
+						</option>{/if}
+					{#each choices(inp) as o (o)}
+						<option value={o}>{o}</option>
+					{/each}
+				</select>
+			{:else if inp.type === 'text'}
+				<textarea id="f-{inp.name}" bind:value={values[inp.name]} rows="4" placeholder={inp.default}
+				></textarea>
+			{:else}
+				<input
+					id="f-{inp.name}"
+					bind:value={values[inp.name]}
+					inputmode={inp.type === 'int' ? 'numeric' : undefined}
+					type={inp.type === 'email' ? 'email' : inp.type === 'url' ? 'url' : 'text'}
+					placeholder={inp.default}
+					aria-invalid={!!err}
+					aria-describedby="h-{inp.name}"
+				/>
+			{/if}
+			<span id="h-{inp.name}" class={err ? 'error' : 'muted'}>
+				{err || helpText(inp, inputs, values)}
+			</span>
+		</div>
+	{:else}
+		<div class="field">
+			<label for="f-{inp.name}">
+				{inp.title ?? inp.name}{#if needsValue(inp)}<span aria-hidden="true"> * </span>{/if}
+			</label>
+			<input
+				id="f-{inp.name}"
+				type="password"
+				autocomplete="new-password"
+				bind:value={secretValues[inp.name]}
+				aria-describedby="h-{inp.name}"
+			/>
+			<span id="h-{inp.name}" class="muted">
+				{helpText(inp, inputs, values) ? helpText(inp, inputs, values) + ' ' : ''}Stored encrypted
+				on the backend.
+			</span>
+		</div>
+	{/if}
+{/snippet}
+
 <header>
 	<h1>Templates</h1>
 	<p>The catalogues of a backend's fleet. Pick a template to fill in its inputs.</p>
@@ -279,59 +338,26 @@
 						</Button>
 					</p>
 				{/each}
-				{#each inputs as inp (inp.name)}
-					{#if inp.type !== 'secret'}
-						{@const err = errors[inp.name]}
-						<div class="field">
-							<label for="f-{inp.name}">
-								{inp.title ?? inp.name}{#if inp.required && !inp.default}<span aria-hidden="true">
-										*
-									</span>{/if}
-							</label>
-							{#if inp.type === 'enum' || inp.type === 'bool' || inp.type === 'gpu'}
-								<select id="f-{inp.name}" bind:value={values[inp.name]}>
-									{#if !inp.required || TYPED.has(inp.type)}<option value="">(default)</option>{/if}
-									{#each choices(inp) as o (o)}
-										<option value={o}>{o}</option>
-									{/each}
-								</select>
-							{:else if inp.type === 'text'}
-								<textarea id="f-{inp.name}" bind:value={values[inp.name]} rows="4"></textarea>
+				{#if split.required.length}
+					<h3>Required</h3>
+					{#each split.required as inp (inp.name)}{@render field(inp)}{/each}
+				{/if}
+				{#if split.optional.length}
+					<details>
+						<summary>Optional settings ({inputs.length - split.required.length})</summary>
+						<p class="muted">Left empty, an input keeps the default shown in it.</p>
+						{#each split.optional as g (g.prefix || g.inputs.map((i) => i.name).join())}
+							{#if g.prefix}
+								<details class="group">
+									<summary>{g.prefix} ({g.inputs.length})</summary>
+									{#each g.inputs as inp (inp.name)}{@render field(inp)}{/each}
+								</details>
 							{:else}
-								<input
-									id="f-{inp.name}"
-									bind:value={values[inp.name]}
-									inputmode={inp.type === 'int' ? 'numeric' : undefined}
-									type={inp.type === 'email' ? 'email' : inp.type === 'url' ? 'url' : 'text'}
-									aria-invalid={!!err}
-									aria-describedby="h-{inp.name}"
-								/>
+								{#each g.inputs as inp (inp.name)}{@render field(inp)}{/each}
 							{/if}
-							<span id="h-{inp.name}" class={err ? 'error' : 'muted'}>
-								{err || helpText(inp, inputs, values)}
-							</span>
-						</div>
-					{:else}
-						<div class="field">
-							<label for="f-{inp.name}">
-								{inp.title ?? inp.name}{#if inp.required && !inp.default}<span aria-hidden="true">
-										*
-									</span>{/if}
-							</label>
-							<input
-								id="f-{inp.name}"
-								type="password"
-								autocomplete="new-password"
-								bind:value={secretValues[inp.name]}
-								aria-describedby="h-{inp.name}"
-							/>
-							<span id="h-{inp.name}" class="muted">
-								{helpText(inp, inputs, values) ? helpText(inp, inputs, values) + ' ' : ''}Stored
-								encrypted on the backend.
-							</span>
-						</div>
-					{/if}
-				{/each}
+						{/each}
+					</details>
+				{/if}
 			</form>
 			{#if secrets.length || t.generate?.length}
 				<div class="note">
@@ -475,6 +501,23 @@
 		display: grid;
 		gap: 0.8rem;
 		max-width: 40rem;
+	}
+	.wizard form h3 {
+		margin: 0.4rem 0 0;
+	}
+	.wizard form details {
+		display: grid;
+		gap: 0.8rem;
+	}
+	.wizard form details > :not(summary) {
+		margin-top: 0.8rem;
+	}
+	details.group {
+		border-left: 3px solid var(--border);
+		padding-left: 0.8rem;
+	}
+	summary {
+		cursor: pointer;
 	}
 	.field {
 		display: flex;
