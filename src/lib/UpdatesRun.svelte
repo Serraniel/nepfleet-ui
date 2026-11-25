@@ -38,9 +38,9 @@
 <div class="run">
 	<strong>{label}</strong>
 	<label><input type="checkbox" bind:checked={now} /> also outside the update window</label>
-	<Button busy={job?.state === 'running'} onclick={run}
-		>{job?.state === 'running' ? 'Running…' : 'Run updates now'}</Button
-	>
+	<Button busy={job?.state === 'running'} onclick={run}>
+		{job?.state === 'running' ? 'Running…' : 'Run updates now'}
+	</Button>
 </div>
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 {#if job}

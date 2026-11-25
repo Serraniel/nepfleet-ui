@@ -31,9 +31,9 @@
 	{#if done}
 		<p role="status">
 			Caddy's DNS records are turned on in its stack, as a commit. Apply it from
-			<a href="/stacks/{encodeURIComponent(backend.id)}/{encodeURIComponent(done.stack)}"
-				>{done.stack}'s page</a
-			>: its pending changes show what changes. Caddy then creates the records within about five
+			<a href="/stacks/{encodeURIComponent(backend.id)}/{encodeURIComponent(done.stack)}">
+				{done.stack}'s page
+			</a>: its pending changes show what changes. Caddy then creates the records within about five
 			minutes, for this site and every site it serves later.
 		</p>
 	{:else}
@@ -46,9 +46,9 @@
 				DNS zone
 				<input bind:value={zone} spellcheck="false" autocomplete="off" />
 			</label>
-			<Button onclick={turnOn} {busy} disabled={!zone.trim()}
-				>Let Caddy create the DNS records…</Button
-			>
+			<Button onclick={turnOn} {busy} disabled={!zone.trim()}>
+				Let Caddy create the DNS records…
+			</Button>
 		</div>
 		<p class="muted small">
 			The zone is the domain the provider holds (e.g. example.org for status.vps.example.org). This

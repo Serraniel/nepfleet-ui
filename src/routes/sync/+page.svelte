@@ -104,8 +104,10 @@
 						<p>
 							<strong>Waiting for you:</strong>
 							{#each s.pending as name, i (name)}{i > 0 ? ', ' : ''}<a
-									href="/stacks/{encodeURIComponent(b.id)}/{encodeURIComponent(name)}">{name}</a
-								>{/each}. Review their plans and apply them.
+									href="/stacks/{encodeURIComponent(b.id)}/{encodeURIComponent(name)}"
+								>
+									{name}
+								</a>{/each}. Review their plans and apply them.
 						</p>
 					{/if}
 					{#if s.failed?.length}

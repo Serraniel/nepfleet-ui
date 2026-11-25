@@ -311,13 +311,15 @@
 <p>
 	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit">Edit files</a>
 	·
-	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit#secrets-h-{name}"
-		>Secrets</a
+	<a
+		href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/edit#secrets-h-{name}"
 	>
+		Secrets
+	</a>
 	·
-	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/rendered"
-		>Rendered files</a
-	>
+	<a href="/stacks/{encodeURIComponent(backendId)}/{encodeURIComponent(name)}/rendered">
+		Rendered files
+	</a>
 	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
 {#if backend && token}<StackInputs {backend} {token} stack={name} onSaved={loadPlan} />{/if}
@@ -361,9 +363,9 @@
 {/if}
 
 {#if !backend}
-	<EmptyState title="Unknown backend"
-		>This backend is not in the list. <a href="/">Add it</a>.</EmptyState
-	>
+	<EmptyState title="Unknown backend">
+		This backend is not in the list. <a href="/">Add it</a>.
+	</EmptyState>
 {:else if !token}
 	<EmptyState title="No token">
 		Add an API token for {backendLabel} on the <a href="/stacks">Stacks</a> page.
@@ -475,9 +477,9 @@
 	<section aria-labelledby="upd-h">
 		<div class="row">
 			<h2 id="upd-h">Image updates</h2>
-			<Button variant="ghost" onclick={loadUpdates} busy={updates?.state === 'loading'}
-				>{updates ? 'Check again' : 'Check for updates'}</Button
-			>
+			<Button variant="ghost" onclick={loadUpdates} busy={updates?.state === 'loading'}>
+				{updates ? 'Check again' : 'Check for updates'}
+			</Button>
 		</div>
 		{#if updates === null}
 			<p class="muted">Asks each image's registry what's newer than what runs.</p>
@@ -495,17 +497,19 @@
 						{#if u.error}<span class="error">{u.error}</span>{/if}
 						{#if u.next}<span>→ <strong>{u.next}</strong> with the next template update</span>{/if}
 						{#if u.rebuilt}<span>rebuilt since it was pinned: apply with an updated lock</span>{/if}
-						{#if u.beyond}<span class="muted">{u.beyond} is out, beyond the {u.track} track</span
-							>{/if}
-						{#if !u.next && !u.rebuilt && !u.beyond && !u.error}<span class="muted">up to date</span
-							>{/if}
+						{#if u.beyond}<span class="muted">
+								{u.beyond} is out, beyond the {u.track} track
+							</span>{/if}
+						{#if !u.next && !u.rebuilt && !u.beyond && !u.error}<span class="muted">
+								up to date
+							</span>{/if}
 					</li>
 				{/each}
 			</ul>
 			{#if updates.value.some((u) => u.next || u.rebuilt)}
-				<Button onclick={() => reviewUpdates(true)} disabled={running}
-					>Review and take updates…</Button
-				>
+				<Button onclick={() => reviewUpdates(true)} disabled={running}>
+					Review and take updates…
+				</Button>
 				<span class="muted">Shows them under Pending changes, to apply from there.</span>
 			{/if}
 		{/if}
@@ -515,13 +519,13 @@
 		<section aria-labelledby="egress-h">
 			<div class="row">
 				<h2 id="egress-h">Outbound traffic</h2>
-				<Button variant="ghost" onclick={loadEgress} busy={egress?.state === 'loading'}
-					>{egress
+				<Button variant="ghost" onclick={loadEgress} busy={egress?.state === 'loading'}>
+					{egress
 						? 'Check again'
 						: planValue.egress === 'enforce'
 							? 'Show refused'
-							: 'Show where it went'}</Button
-				>
+							: 'Show where it went'}
+				</Button>
 			</div>
 			{#if egress === null}
 				<p class="muted">
@@ -549,27 +553,29 @@
 				</p>
 				<ul class="updates">
 					{#each egress.value.hosts as h (h)}<li>
-							<label
-								><input type="checkbox" bind:checked={egressPicked[h]} /> <code>{h}</code></label
-							>
+							<label>
+								<input type="checkbox" bind:checked={egressPicked[h]} /> <code>{h}</code>
+							</label>
 						</li>{/each}
 					{#each egress.value.addresses as a (a)}<li>
-							<label
-								><input type="checkbox" bind:checked={egressPicked[a]} /> <code>{a}</code></label
-							>
+							<label>
+								<input type="checkbox" bind:checked={egressPicked[a]} /> <code>{a}</code>
+							</label>
 							<span class="muted">no name seen; an address may change</span>
 						</li>{/each}
 				</ul>
 				<p class="muted">
-					Pick only what it needs: this is what it did, not what it should do. Allowing adds them to <code
-						>spec.egress.allow</code
-					> in its stack.yaml, in a commit in your name.
+					Pick only what it needs: this is what it did, not what it should do. Allowing adds them to <code>
+						spec.egress.allow
+					</code> in its stack.yaml, in a commit in your name.
 				</p>
 				<Button
 					busy={egressSaving}
 					disabled={!Object.values(egressPicked).some(Boolean)}
-					onclick={allowPicked}>Allow selected</Button
+					onclick={allowPicked}
 				>
+					Allow selected
+				</Button>
 				{#if egressNote}<p role="status">{egressNote}</p>{/if}
 			{/if}
 		</section>
@@ -582,9 +588,9 @@
 	<section aria-labelledby="hist-h">
 		<div class="row">
 			<h2 id="hist-h">History</h2>
-			<Button variant="ghost" onclick={loadHistory} busy={history.state === 'loading'}
-				>Refresh</Button
-			>
+			<Button variant="ghost" onclick={loadHistory} busy={history.state === 'loading'}>
+				Refresh
+			</Button>
 		</div>
 		{#if history.state === 'loading'}
 			<p><Spinner label="Loading…" /></p>
@@ -604,8 +610,10 @@
 								variant="ghost"
 								onclick={() => askRollback(h)}
 								disabled={running}
-								aria-label="Roll back to {h.commit.slice(0, 7)}">Roll back…</Button
+								aria-label="Roll back to {h.commit.slice(0, 7)}"
 							>
+								Roll back…
+							</Button>
 						{/if}
 					</li>
 				{/each}

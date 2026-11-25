@@ -138,10 +138,10 @@
 			<ul>
 				{#each Object.keys(drafts).sort() as p (p)}
 					<li>
-						<button type="button" class:current={p === selected} onclick={() => (selected = p)}
-							>{p}{#if changed.includes(p)}
-								•{/if}</button
-						>
+						<button type="button" class:current={p === selected} onclick={() => (selected = p)}>
+							{p}{#if changed.includes(p)}
+								•{/if}
+						</button>
 					</li>
 				{/each}
 			</ul>
@@ -169,13 +169,13 @@
 			bind:value={message}
 			maxlength="200"
 		/>
-		<Button variant="primary" onclick={save} busy={saving} disabled={changed.length === 0}
-			>{saving
+		<Button variant="primary" onclick={save} busy={saving} disabled={changed.length === 0}>
+			{saving
 				? 'Saving…'
 				: changed.length
 					? `Save ${changed.length} file${changed.length === 1 ? '' : 's'}`
-					: 'No changes'}</Button
-		>
+					: 'No changes'}
+		</Button>
 	</div>
 	{#if saveError}<p class="error" role="alert">{saveError}</p>{/if}
 	{#if savedCommit}

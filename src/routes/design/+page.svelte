@@ -52,21 +52,21 @@
 	<h2 id="dialogs">Dialog and toasts</h2>
 	<div class="row">
 		<Button onclick={() => (dialogOpen = true)}>Open dialog</Button>
-		<Button onclick={() => toasts.push('Stack vaultwarden applied', 'success')}
-			>Success toast</Button
-		>
-		<Button onclick={() => toasts.push('Apply failed: health check timed out', 'error')}
-			>Error toast</Button
-		>
+		<Button onclick={() => toasts.push('Stack vaultwarden applied', 'success')}>
+			Success toast
+		</Button>
+		<Button onclick={() => toasts.push('Apply failed: health check timed out', 'error')}>
+			Error toast
+		</Button>
 	</div>
 	<Dialog bind:open={dialogOpen} title="Apply vaultwarden?">
 		The new image is pulled and the stack restarted. If it does not become healthy, the previous
 		version is restored.
 		{#snippet actions()}
 			<Button onclick={() => (dialogOpen = false)}>Cancel</Button>
-			<Button onclick={() => toasts.push('Apply failed: image not found', 'error')}
-				>Fail while open</Button
-			>
+			<Button onclick={() => toasts.push('Apply failed: image not found', 'error')}>
+				Fail while open
+			</Button>
 			<Button variant="primary" onclick={() => (dialogOpen = false)}>Apply</Button>
 		{/snippet}
 	</Dialog>

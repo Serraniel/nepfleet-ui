@@ -30,8 +30,9 @@
 	{busy}
 	onclick={download}
 	title="The images it runs, as a CycloneDX software bill of materials"
-	>{busy ? 'Preparing SBOM…' : stack ? 'Download SBOM' : 'Download the fleet’s SBOM'}</Button
 >
+	{busy ? 'Preparing SBOM…' : stack ? 'Download SBOM' : 'Download the fleet’s SBOM'}
+</Button>
 {#if error}<span class="error" role="alert">{error}</span>{/if}
 
 <style>

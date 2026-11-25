@@ -61,8 +61,8 @@
 		UI), or run <code>nepfleet key backup --out FILE</code> on the host.
 	</p>
 {:else}
-	<label class="keys"
-		>Public keys, one per line
+	<label class="keys">
+		Public keys, one per line
 		<textarea
 			bind:value={keys}
 			rows="3"

@@ -59,9 +59,9 @@
 			<option value="error">errors only</option>
 		</select>
 	</label>
-	<Button type="submit" busy={saving} disabled={!NAME.test(name.trim()) || !url.trim()}
-		>Add channel</Button
-	>
+	<Button type="submit" busy={saving} disabled={!NAME.test(name.trim()) || !url.trim()}>
+		Add channel
+	</Button>
 </form>
 <p class="muted hint">
 	A shoutrrr URL: ntfy, Discord, Telegram, Slack, e-mail and more. It's stored encrypted in the

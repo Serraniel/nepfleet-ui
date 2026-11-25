@@ -227,8 +227,9 @@
 	<div class="filters">
 		<label for="backend" class="sr-only">Backend</label>
 		<select id="backend" bind:value={backendId}>
-			{#each withToken as b (b.id)}<option value={b.id}>{b.label ?? new URL(b.url).host}</option
-				>{/each}
+			{#each withToken as b (b.id)}<option value={b.id}>
+					{b.label ?? new URL(b.url).host}
+				</option>{/each}
 		</select>
 		<label for="q" class="sr-only">Search</label>
 		<input id="q" type="search" placeholder="Search templates" bind:value={query} />
@@ -273,9 +274,9 @@
 				{#each needs as n (n.name)}
 					<p class="needs" role="note">
 						{n.why}, and it isn't set up there yet.
-						<Button variant="ghost" onclick={() => picked && pickNamed(picked.source, n.name)}
-							>Set up {n.name} first</Button
-						>
+						<Button variant="ghost" onclick={() => picked && pickNamed(picked.source, n.name)}>
+							Set up {n.name} first
+						</Button>
 					</p>
 				{/each}
 				{#each inputs as inp (inp.name)}
@@ -284,8 +285,8 @@
 						<div class="field">
 							<label for="f-{inp.name}">
 								{inp.title ?? inp.name}{#if inp.required && !inp.default}<span aria-hidden="true">
-										*</span
-									>{/if}
+										*
+									</span>{/if}
 							</label>
 							{#if inp.type === 'enum' || inp.type === 'bool' || inp.type === 'gpu'}
 								<select id="f-{inp.name}" bind:value={values[inp.name]}>
@@ -314,8 +315,8 @@
 						<div class="field">
 							<label for="f-{inp.name}">
 								{inp.title ?? inp.name}{#if inp.required && !inp.default}<span aria-hidden="true">
-										*</span
-									>{/if}
+										*
+									</span>{/if}
 							</label>
 							<input
 								id="f-{inp.name}"
@@ -355,12 +356,14 @@
 					variant="primary"
 					onclick={create}
 					disabled={!valid || secretsMissing}
-					busy={creating}>{creating ? 'Creating…' : 'Create stack'}</Button
+					busy={creating}
 				>
-				<span class="muted"
-					>Commits it to the fleet repository without applying it: review its plan on the next page,
-					then apply.</span
-				>
+					{creating ? 'Creating…' : 'Create stack'}
+				</Button>
+				<span class="muted">
+					Commits it to the fleet repository without applying it: review its plan on the next page,
+					then apply.
+				</span>
 			</div>
 			{#if createError}<p class="error" role="alert">{createError}</p>{/if}
 			<h3>Or from the command line</h3>
@@ -372,9 +375,9 @@
 			</p>
 		</section>
 	{:else if shown.length === 0}
-		<EmptyState title="No templates"
-			>{entries.length ? 'Nothing matches.' : 'The catalogue is empty.'}</EmptyState
-		>
+		<EmptyState title="No templates">
+			{entries.length ? 'Nothing matches.' : 'The catalogue is empty.'}
+		</EmptyState>
 	{:else}
 		<ul class="grid">
 			{#each shown as e (e.source + '/' + e.t.name)}

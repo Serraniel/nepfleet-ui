@@ -12,9 +12,9 @@
 <figure>
 	<figcaption>
 		{label}
-		<span aria-hidden="true"
-			><span class="add">+{counts.added}</span> <span class="del">−{counts.removed}</span></span
-		>
+		<span aria-hidden="true">
+			<span class="add">+{counts.added}</span> <span class="del">−{counts.removed}</span>
+		</span>
 		<span class="sr-only">{counts.added} lines added, {counts.removed} removed</span>
 	</figcaption>
 	{#if lines.length === 0}
@@ -27,11 +27,13 @@
 						<td class="num" aria-hidden="true">{l.old ?? ''}</td>
 						<td class="num" aria-hidden="true">{l.new ?? ''}</td>
 						<!-- The marker carries the meaning, not only the colour. -->
-						<td class="mark"
-							><span aria-hidden="true">{marker[l.kind]}</span>{#if spoken[l.kind]}<span
-									class="sr-only">{spoken[l.kind]}</span
-								>{/if}</td
-						>
+						<td class="mark">
+							<span aria-hidden="true">{marker[l.kind]}</span>{#if spoken[l.kind]}<span
+									class="sr-only"
+								>
+									{spoken[l.kind]}
+								</span>{/if}
+						</td>
 						<td class="text">{l.text}</td>
 					</tr>
 				{/each}

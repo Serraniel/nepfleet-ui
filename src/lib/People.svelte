@@ -61,27 +61,27 @@
 			<li>
 				<div class="who">
 					<strong>{u.name}</strong>
-					<span class="muted"
-						>{u.external
+					<span class="muted">
+						{u.external
 							? 'through the identity provider'
-							: `${u.passkeys.length} passkey(s)`}{u.codes ? ', sign-in codes on' : ''}</span
-					>
-					<Button variant="danger" disabled={busy} onclick={() => remove(u.name, null)}
-						>Remove person</Button
-					>
+							: `${u.passkeys.length} passkey(s)`}{u.codes ? ', sign-in codes on' : ''}
+					</span>
+					<Button variant="danger" disabled={busy} onclick={() => remove(u.name, null)}>
+						Remove person
+					</Button>
 				</div>
 				{#if u.passkeys.length}
 					<ul class="keys">
 						{#each u.passkeys as p (p.id)}
 							<li>
 								<code>{p.name}</code>
-								<span class="muted"
-									>{p.synced ? 'synced' : 'security key or phone'}, used {p.uses} time(s)</span
-								>
+								<span class="muted">
+									{p.synced ? 'synced' : 'security key or phone'}, used {p.uses} time(s)
+								</span>
 								{#if p.locked}<strong class="error">Locked: may have been copied</strong>{/if}
-								<Button variant="ghost" disabled={busy} onclick={() => remove(u.name, p.id)}
-									>Remove passkey</Button
-								>
+								<Button variant="ghost" disabled={busy} onclick={() => remove(u.name, p.id)}>
+									Remove passkey
+								</Button>
 							</li>
 						{/each}
 					</ul>
