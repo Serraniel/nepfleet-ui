@@ -22,10 +22,10 @@
 		"tauri": "tauri"
 	},
 	"dependencies": {
-		"@sveltejs/kit": "3.2.0",
-		"@tauri-apps/api": "2.12.4",
+		"@sveltejs/kit": "3.4.0",
+		"@tauri-apps/api": "2.12.5",
 		"@tauri-apps/plugin-notification": "2.8.1",
-		"svelte": "5.57.3"
+		"svelte": "5.59.1"
 	},
 	"devDependencies": {
 		"@axe-core/playwright": "4.14.0",
