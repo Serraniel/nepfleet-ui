@@ -60,8 +60,73 @@ import {
 	scopeMessage,
 	setChannel,
 	fetchRoutes,
-	saveRoutes
+	saveRoutes,
+	fetchMail,
+	saveMail,
+	testMail
 } from './backend.ts';
+
+describe('mail', () => {
+	const backend = { id: 'b', url: 'https://fleet.example.org' };
+	const reply = (status: number, body: unknown) =>
+		(async () =>
+			new Response(status === 204 ? null : typeof body === 'string' ? body : JSON.stringify(body), {
+				status
+			})) as unknown as typeof fetch;
+	it('reads the settings, and an older backend has none', async () => {
+		const m = {
+			configured: true,
+			host: 'smtp.example.test',
+			port: 587,
+			user: 'u',
+			from: 'f@example.test',
+			tls: 'starttls',
+			passwordSet: true
+		};
+		expect(await fetchMail(backend, 't', reply(200, m))).toEqual(m);
+		expect(await fetchMail(backend, 't', reply(404, ''))).toBeNull();
+		await expect(fetchMail(backend, 't', reply(200, { host: 1 }))).rejects.toThrow(/Unexpected/);
+		await expect(fetchMail(backend, 't', reply(403, ''))).rejects.toBeInstanceOf(ScopeError);
+	});
+	it('saves and removes, asking for a passkey when told', async () => {
+		const sent: { url: string; method: string; body: unknown }[] = [];
+		const ok = (async (u: string, init: RequestInit) => {
+			sent.push({ url: u, method: init.method ?? '', body: init.body });
+			return new Response(JSON.stringify({ commit: 'c1' }));
+		}) as unknown as typeof fetch;
+		expect(await saveMail(backend, 't', { host: 'smtp.example.test', password: 'pw' }, ok)).toBe(
+			'c1'
+		);
+		await saveMail(backend, 't', null, ok);
+		expect(sent[0]).toEqual({
+			url: 'https://fleet.example.org/api/v1/mail',
+			method: 'PUT',
+			body: '{"host":"smtp.example.test","password":"pw"}'
+		});
+		expect(sent[1]).toMatchObject({ method: 'DELETE', body: undefined });
+		const save = (f: typeof fetch) => saveMail(backend, 't', { host: 'h' }, f);
+		await expect(save(reply(403, { verify: true }))).rejects.toBeInstanceOf(VerifyFirstError);
+		await expect(save(reply(403, 'no'))).rejects.toThrow(/admin/);
+		await expect(save(reply(409, 'busy'))).rejects.toBeInstanceOf(ConflictError);
+		await expect(save(reply(400, 'not saved: host is wrong'))).rejects.toThrow(/host is wrong/);
+	});
+	it('sends a test, with the reason when it fails', async () => {
+		let body = '';
+		const ok = (async (_u: string, init: RequestInit) => {
+			body = String(init.body);
+			return new Response(null, { status: 204 });
+		}) as unknown as typeof fetch;
+		await testMail(backend, 't', 'me@example.test', ok);
+		expect(JSON.parse(body)).toEqual({ to: 'me@example.test' });
+		await expect(
+			testMail(backend, 't', 'a@example.test', reply(502, 'sending failed: 535'))
+		).rejects.toThrow(/535/);
+		await expect(testMail(backend, 't', 'a@example.test', reply(429, 'at most 5'))).rejects.toThrow(
+			/at most 5/
+		);
+		await expect(testMail(backend, 't', 'a@example.test', reply(404, ''))).rejects.toThrow(/Save/);
+	});
+});
 
 describe('stackRelations', () => {
 	const base = { target: 'nas', mode: 'compose', apply: 'manual', updates: 'notify' };

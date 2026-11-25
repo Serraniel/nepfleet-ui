@@ -1440,6 +1440,131 @@ export async function saveRoutes(
 	return o.commit;
 }
 
+export type MailTLS = 'starttls' | 'tls' | 'none';
+
+/** The fleet's mail settings (GET /api/v1/mail). The password is never sent, only whether it's set. */
+export interface MailSettings {
+	configured: boolean;
+	host: string;
+	port: number;
+	user: string;
+	from: string;
+	tls: MailTLS | '';
+	passwordSet: boolean;
+}
+
+/** What saving takes. password: undefined keeps the stored one, '' removes it. */
+export interface MailUpdate {
+	host: string;
+	port?: number;
+	user?: string;
+	from?: string;
+	tls?: MailTLS;
+	password?: string;
+}
+
+function isMailSettings(v: unknown): v is MailSettings {
+	const o = v as Partial<MailSettings> | null;
+	return (
+		typeof o?.configured === 'boolean' &&
+		typeof o.host === 'string' &&
+		typeof o.port === 'number' &&
+		typeof o.user === 'string' &&
+		typeof o.from === 'string' &&
+		typeof o.tls === 'string' &&
+		typeof o.passwordSet === 'boolean'
+	);
+}
+
+/** The fleet's mail settings (admin scope); null on a backend too old to have them. */
+export async function fetchMail(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<MailSettings | null> {
+	const res = await fetcher(`${backend.url}/api/v1/mail`, {
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/json', ...authInit(token).headers }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) throw new ScopeError(scopeMessage('admin'));
+	if (res.status === 404 || res.status === 405) return null;
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	const body: unknown = await res.json();
+	if (!isMailSettings(body)) throw new Error('Unexpected response');
+	return body;
+}
+
+/**
+ * Saves (settings) or removes (null) the fleet's mail settings, committed on
+ * the backend with the password encrypted; returns the commit. Throws
+ * VerifyFirstError when a person must confirm with a passkey first.
+ */
+export async function saveMail(
+	backend: Backend,
+	token: string,
+	settings: MailUpdate | null,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	const res = await fetcher(`${backend.url}/api/v1/mail`, {
+		method: settings === null ? 'DELETE' : 'PUT',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: settings === null ? undefined : JSON.stringify(settings)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Changing mail settings needs an admin token, or signing in.');
+	}
+	if (res.status === 404)
+		throw new NotFoundError(settings === null ? 'No mail settings to remove' : 'Not found');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown };
+	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
+	return o.commit;
+}
+
+/** Sends a test mail to `to` with the saved settings (admin scope). Throws with the reason. */
+export async function testMail(
+	backend: Backend,
+	token: string,
+	to: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<void> {
+	const res = await fetcher(`${backend.url}/api/v1/mail/test`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify({ to })
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429)
+		throw new Error((await res.text()).trim() || 'Too many test mails; try again later');
+	if (res.status === 403)
+		throw new ScopeError('Sending a test needs an admin token, or signing in.');
+	if (res.status === 404) throw new NotFoundError('Save the mail settings first');
+	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+}
+
 /** A CycloneDX SBOM of a stack, or of the fleet's stacks the token sees (stack ''). */
 export async function fetchSBOM(
 	backend: Backend,
