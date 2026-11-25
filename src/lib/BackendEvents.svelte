@@ -62,8 +62,9 @@
 						<strong>
 							{#if e.stack}<a
 									href="/stacks/{encodeURIComponent(e.backend)}/{encodeURIComponent(e.stack)}"
-									>{e.title}</a
-								>{:else}{e.title}{/if}
+								>
+									{e.title}
+								</a>{:else}{e.title}{/if}
 						</strong>
 						<span class="muted">
 							{[e.label, e.stack].filter(Boolean).join(' / ')} ·

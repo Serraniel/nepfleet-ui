@@ -89,17 +89,18 @@
 	{:else if backups.volumes.length === 0}
 		<p class="muted">The stack has no volumes on this host: apply it here first.</p>
 	{:else}
-		<label class="field"
-			>Archive
+		<label class="field">
+			Archive
 			<select bind:value={archive}>
 				{#each backups.archives as a (a)}<option value={a}>{when(a)}</option>{/each}
 			</select>
 		</label>
 		<fieldset>
 			<legend>Volumes</legend>
-			{#each backups.volumes as v (v)}<label
-					><input type="checkbox" bind:checked={picked[v]} /> {v}</label
-				>{/each}
+			{#each backups.volumes as v (v)}<label>
+					<input type="checkbox" bind:checked={picked[v]} />
+					{v}
+				</label>{/each}
 		</fieldset>
 		<p>
 			The stack stops while its data is replaced. The current data of each volume is kept in a copy
@@ -112,8 +113,10 @@
 				!archive ||
 				!Object.values(picked).some(Boolean) ||
 				job?.state === 'running'}
-			onclick={restore}>Restore</Button
+			onclick={restore}
 		>
+			Restore
+		</Button>
 	{/if}
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
 	{#if job}

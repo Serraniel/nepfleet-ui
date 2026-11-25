@@ -180,30 +180,38 @@
 									variant="ghost"
 									onclick={() => toggleLogs(c.name)}
 									busy={logs[c.name]?.loading}
-									aria-expanded={!!logs[c.name]}>{logs[c.name] ? 'Hide logs' : 'Logs'}</Button
+									aria-expanded={!!logs[c.name]}
 								>
+									{logs[c.name] ? 'Hide logs' : 'Logs'}
+								</Button>
 								{#if firstOfService(i)}
 									<Button
 										variant="ghost"
 										onclick={() => act(c.service, 'restart')}
 										disabled={!!busy[c.service]}
-										busy={busy[c.service] === 'restart'}>Restart</Button
+										busy={busy[c.service] === 'restart'}
 									>
+										Restart
+									</Button>
 									{#if !swarm}
 										{#if c.state === 'running'}
 											<Button
 												variant="ghost"
 												onclick={() => act(c.service, 'stop')}
 												disabled={!!busy[c.service]}
-												busy={busy[c.service] === 'stop'}>Stop</Button
+												busy={busy[c.service] === 'stop'}
 											>
+												Stop
+											</Button>
 										{:else}
 											<Button
 												variant="ghost"
 												onclick={() => act(c.service, 'start')}
 												disabled={!!busy[c.service]}
-												busy={busy[c.service] === 'start'}>Start</Button
+												busy={busy[c.service] === 'start'}
 											>
+												Start
+											</Button>
 										{/if}
 									{/if}
 								{/if}
@@ -217,19 +225,20 @@
 										<p class="error" role="alert">{l.error}</p>
 									{:else if l.text !== undefined}
 										<div class="row">
-											<span class="muted small" role="status"
-												>{followed[c.name]
+											<span class="muted small" role="status">
+												{followed[c.name]
 													? `Following ${c.name}: new output appears as it comes`
-													: `The last 200 lines of ${c.name}`}</span
-											>
+													: `The last 200 lines of ${c.name}`}
+											</span>
 											<span>
 												{#if followed[c.name]}
-													<Button variant="ghost" onclick={() => stopFollowing(c.name)}>Stop</Button
-													>
+													<Button variant="ghost" onclick={() => stopFollowing(c.name)}>
+														Stop
+													</Button>
 												{:else}
-													<Button variant="ghost" onclick={() => loadLogs(c.name)} busy={l.loading}
-														>Refresh</Button
-													>
+													<Button variant="ghost" onclick={() => loadLogs(c.name)} busy={l.loading}>
+														Refresh
+													</Button>
 													<Button variant="ghost" onclick={() => follow(c.name)}>Follow</Button>
 												{/if}
 											</span>

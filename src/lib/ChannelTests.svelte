@@ -111,14 +111,16 @@
 						{@const r = result[`${b.id}/${c}`]}
 						<li>
 							<code>{c}</code>
-							<Button busy={sending[`${b.id}/${c}`]} onclick={() => test(b.id, c)}>Send test</Button
-							>
+							<Button busy={sending[`${b.id}/${c}`]} onclick={() => test(b.id, c)}>
+								Send test
+							</Button>
 							<Button
 								variant={confirmRemove === `${b.id}/${c}` ? 'danger' : 'ghost'}
 								busy={removing[`${b.id}/${c}`]}
 								onclick={() => remove(b.id, c)}
-								>{confirmRemove === `${b.id}/${c}` ? 'Remove for good' : 'Remove…'}</Button
 							>
+								{confirmRemove === `${b.id}/${c}` ? 'Remove for good' : 'Remove…'}
+							</Button>
 							{#if r}<span class:error={!r.ok} class:muted={r.ok} role="status">{r.text}</span>{/if}
 						</li>
 					{/each}

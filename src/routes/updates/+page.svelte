@@ -99,17 +99,17 @@
 		{/each}
 	</section>
 	<h2>What's new</h2>
-	<Button onclick={checkAll} busy={checking}
-		>{checking ? 'Checking…' : rows.length ? 'Check again' : 'Check every stack'}</Button
-	>
+	<Button onclick={checkAll} busy={checking}>
+		{checking ? 'Checking…' : rows.length ? 'Check again' : 'Check every stack'}
+	</Button>
 	<p class="muted">It asks each image's registry, stack by stack, so it takes a while.</p>
 	{#if rows.length}
 		<ul class="rows">
 			{#each rows as r (r.backend + '/' + r.stack)}
 				<li>
-					<a href="/stacks/{encodeURIComponent(r.backend)}/{encodeURIComponent(r.stack)}"
-						><strong>{r.stack}</strong></a
-					>
+					<a href="/stacks/{encodeURIComponent(r.backend)}/{encodeURIComponent(r.stack)}">
+						<strong>{r.stack}</strong>
+					</a>
 					<span class="muted">{label(r.backend)}</span>
 					{#if r.state === 'waiting'}
 						<span class="muted">waiting</span>
@@ -126,8 +126,9 @@
 									<code>{u.image}:{u.current}</code>
 									{#if u.next}→ <strong>{u.next}</strong>{/if}
 									{#if u.rebuilt}<span>rebuilt since pinned</span>{/if}
-									{#if u.beyond}<span class="muted">{u.beyond} beyond the {u.track} track</span
-										>{/if}
+									{#if u.beyond}<span class="muted">
+											{u.beyond} beyond the {u.track} track
+										</span>{/if}
 									{#if u.error}<span class="error">{u.error}</span>{/if}
 								</li>
 							{/each}
@@ -136,8 +137,10 @@
 							class="take"
 							href="/stacks/{encodeURIComponent(r.backend)}/{encodeURIComponent(
 								r.stack
-							)}?take=updates">Review and take…</a
+							)}?take=updates"
 						>
+							Review and take…
+						</a>
 					{/if}
 				</li>
 			{/each}

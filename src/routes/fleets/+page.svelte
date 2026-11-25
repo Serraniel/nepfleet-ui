@@ -415,17 +415,20 @@
 			onclick={checkAllUpdates}
 			busy={checkingAll}
 			title="Asks every machine's package manager what it has pending; installs nothing"
-			>Check host updates on all {linuxRemotes.length} machines</Button
 		>
+			Check host updates on all {linuxRemotes.length} machines
+		</Button>
 	{/if}
 	{#if overview.length}
 		<table class="hosts" aria-label="Host updates per machine, as last checked">
 			<thead>
-				<tr
-					><th scope="col">Machine</th><th scope="col">OS</th><th scope="col">Updates</th><th
-						scope="col">Security</th
-					><th scope="col">Reboot</th><th scope="col">Checked</th></tr
-				>
+				<tr>
+					<th scope="col">Machine</th><th scope="col">OS</th><th scope="col">Updates</th><th
+						scope="col"
+					>
+						Security
+					</th><th scope="col">Reboot</th><th scope="col">Checked</th>
+				</tr>
 			</thead>
 			<tbody>
 				{#each overview as o (o.name)}
@@ -433,19 +436,20 @@
 					<tr>
 						<th scope="row"><a href="#machine-{o.name}">{o.name}</a></th>
 						<td>{v.os}</td>
-						<td
-							>{#if !v.supported}<span class="muted">can't check</span
-								>{:else}{v.pending}{#if v.fresh === false}<span
+						<td>
+							{#if !v.supported}<span class="muted">
+									can't check
+								</span>{:else}{v.pending}{#if v.fresh === false}<span
 										class="muted"
 										title="Only as new as the package lists"
 									>
-										(lists)</span
-									>{/if}{/if}</td
-						>
+										(lists)
+									</span>{/if}{/if}
+						</td>
 						<td class:warn={v.security > 0}>{v.security < 0 ? '?' : v.security}</td>
-						<td class:warn={v.rebootRequired === true}
-							>{v.rebootRequired === null ? '?' : v.rebootRequired ? 'needed' : 'no'}</td
-						>
+						<td class:warn={v.rebootRequired === true}>
+							{v.rebootRequired === null ? '?' : v.rebootRequired ? 'needed' : 'no'}
+						</td>
 						<td class="muted">{ago(o.at)}</td>
 					</tr>
 				{/each}
@@ -503,8 +507,9 @@ nepfleet control token</code
 				busy={local.restartingDaemon}
 				onclick={() => local.restartDaemon()}
 				title="Stop the daemon and start the nepfleet installed now. Tunnels come back by themselves."
-				>{local.restartingDaemon ? 'Restarting…' : 'Restart the daemon'}</Button
 			>
+				{local.restartingDaemon ? 'Restarting…' : 'Restart the daemon'}
+			</Button>
 		{:else}
 			<Button variant="ghost" onclick={() => local.disconnect()}>Forget token</Button>
 		{/if}
@@ -514,9 +519,9 @@ nepfleet control token</code
 			NepFleet was updated to {local.installed.version}{#if local.installed.commit}
 				({local.installed.commit.slice(0, 7)}){/if}, but the daemon still runs the build it started
 			with. Restart it to use the new one.
-			<Button variant="primary" busy={local.restartingDaemon} onclick={() => local.restartDaemon()}
-				>Restart the daemon</Button
-			>
+			<Button variant="primary" busy={local.restartingDaemon} onclick={() => local.restartDaemon()}>
+				Restart the daemon
+			</Button>
 		</p>
 	{/if}
 	{#if local.restartError}<p class="error" role="alert">{local.restartError}</p>{/if}
@@ -588,8 +593,9 @@ nepfleet control token</code
 							<Button
 								variant="primary"
 								onclick={() => askUnlock(r.lockedKeys ?? [], () => act(r, 'refresh'))}
-								>Unlock key…</Button
 							>
+								Unlock key…
+							</Button>
 						</p>
 					{/if}
 					<div class="actions">
@@ -597,35 +603,41 @@ nepfleet control token</code
 							<a href="/stacks">Stacks</a>
 						{/if}
 						{#if setupKind(r.report)}
-							<Button variant="primary" onclick={() => openSetup(r)} disabled={!!busy[r.name]}
-								>{setupKind(r.report) === 'bootstrap'
+							<Button variant="primary" onclick={() => openSetup(r)} disabled={!!busy[r.name]}>
+								{setupKind(r.report) === 'bootstrap'
 									? 'Prepare this machine…'
-									: 'Install NepFleet…'}</Button
-							>
+									: 'Install NepFleet…'}
+							</Button>
 						{/if}
 						{#if r.connect}
 							<Button
 								onclick={() => act(r, 'disconnect')}
 								disabled={!!busy[r.name]}
-								busy={busy[r.name] === 'disconnect'}>Disconnect</Button
+								busy={busy[r.name] === 'disconnect'}
 							>
+								Disconnect
+							</Button>
 						{:else if canConnect(r.report)}
 							<Button
 								onclick={() => act(r, 'connect')}
 								disabled={!!busy[r.name]}
-								busy={busy[r.name] === 'connect'}>Connect</Button
+								busy={busy[r.name] === 'connect'}
 							>
+								Connect
+							</Button>
 						{/if}
 						{#if r.report && !setupKind(r.report)}
-							<Button onclick={() => openSetup(r, 'mounts')} disabled={!!busy[r.name]}
-								>Network mounts…</Button
-							>
+							<Button onclick={() => openSetup(r, 'mounts')} disabled={!!busy[r.name]}>
+								Network mounts…
+							</Button>
 						{/if}
 						<Button
 							onclick={() => act(r, 'refresh')}
 							disabled={!!busy[r.name]}
-							busy={busy[r.name] === 'refresh'}>Check again</Button
+							busy={busy[r.name] === 'refresh'}
 						>
+							Check again
+						</Button>
 						{#if updateOffer(r.report, local.version)}
 							<Button
 								variant="primary"
@@ -634,16 +646,19 @@ nepfleet control token</code
 								title={local.version === 'edge'
 									? 'Updates it to the newest build of main (the signed :edge image), to test before a release'
 									: 'This machine runs an older NepFleet than this app'}
-								>Update NepFleet to {updateOffer(r.report, local.version)}…</Button
 							>
+								Update NepFleet to {updateOffer(r.report, local.version)}…
+							</Button>
 						{/if}
 						{#if r.report?.nepfleet || r.report?.nepfleetRunning}
 							<Button
 								onclick={() => checkNepFleet(r)}
 								disabled={!!busy[r.name]}
 								busy={busy[r.name] === 'doctor'}
-								title="Runs nepfleet doctor on the machine over SSH">Check NepFleet</Button
+								title="Runs nepfleet doctor on the machine over SSH"
 							>
+								Check NepFleet
+							</Button>
 						{/if}
 						{#if r.report?.kernel === 'Linux'}
 							<Button
@@ -651,15 +666,17 @@ nepfleet control token</code
 								disabled={!!busy[r.name]}
 								busy={busy[r.name] === 'updates'}
 								title="Asks the machine's package manager over SSH what it has pending; installs nothing"
-								>Check host updates</Button
 							>
+								Check host updates
+							</Button>
 							<Button
 								variant="ghost"
 								onclick={() => openSetup(r, 'ssh-harden')}
 								disabled={!!busy[r.name]}
 								title="Plans it for you to review: only keys can log in afterwards, as this app already does"
-								>Turn off SSH password logins…</Button
 							>
+								Turn off SSH password logins…
+							</Button>
 						{/if}
 						<Button
 							variant="ghost"
@@ -668,8 +685,10 @@ nepfleet control token</code
 								removeOpen = true;
 							}}
 							disabled={!!busy[r.name]}
-							busy={busy[r.name] === 'remove'}>Remove…</Button
+							busy={busy[r.name] === 'remove'}
 						>
+							Remove…
+						</Button>
 					</div>
 					{#if hostUpdates[r.name]}
 						{@const u = hostUpdates[r.name]!}
@@ -690,16 +709,18 @@ nepfleet control token</code
 												onclick={() => openSetup(r, 'host-update')}
 												disabled={!!busy[r.name]}
 												title="Plans the update for you to review; nothing runs until you start it. It refreshes the package lists first."
-												>{offer}</Button
 											>
+												{offer}
+											</Button>
 										{/if}
 										{#if u.value.rebootRequired}
 											<Button
 												onclick={() => openSetup(r, 'reboot')}
 												disabled={!!busy[r.name]}
 												title="Plans the reboot and the check afterwards; nothing runs until you start it"
-												>Reboot…</Button
 											>
+												Reboot…
+											</Button>
 										{/if}
 									</p>
 								{/if}
@@ -719,9 +740,9 @@ nepfleet control token</code
 										<ul>
 											{#each u.value.news as n, i (i)}
 												<li>
-													{#if n.link}<a href={n.link} target="_blank" rel="noopener noreferrer"
-															>{n.title}</a
-														>{:else}{n.title}{/if}
+													{#if n.link}<a href={n.link} target="_blank" rel="noopener noreferrer">
+															{n.title}
+														</a>{:else}{n.title}{/if}
 													<span class="muted">({new Date(n.published).toLocaleDateString()})</span>
 												</li>
 											{/each}
@@ -759,17 +780,17 @@ nepfleet control token</code
 														domain={dnsDomain(c.detail ?? '')}
 													/>
 												{:else if !live}
-													<span class="muted"
-														>Connect to {r.name} to let its Caddy create the records from here.</span
-													>
+													<span class="muted">
+														Connect to {r.name} to let its Caddy create the records from here.
+													</span>
 												{/if}
 											{:else if c.action}
 												{@const kind = c.action}
-												<span
-													><Button onclick={() => openSetup(r, kind)} disabled={!!busy[r.name]}
-														>{setupTitles[kind]}…</Button
-													></span
-												>
+												<span>
+													<Button onclick={() => openSetup(r, kind)} disabled={!!busy[r.name]}>
+														{setupTitles[kind]}…
+													</Button>
+												</span>
 											{/if}
 										</li>
 									{/each}
@@ -800,8 +821,9 @@ nepfleet control token</code
 				bind:value={passphrase}
 				disabled={unlocking}
 			/>
-			<span class="muted">Sent to the NepFleet daemon on this computer only, and kept nowhere.</span
-			>
+			<span class="muted">
+				Sent to the NepFleet daemon on this computer only, and kept nowhere.
+			</span>
 		</label>
 		{#if unlockError}<p class="error" role="alert">{unlockError}</p>{/if}
 	</form>
@@ -812,8 +834,10 @@ nepfleet control token</code
 			type="submit"
 			form="unlock-form"
 			busy={unlocking}
-			disabled={!passphrase}>{unlocking ? 'Unlocking…' : 'Unlock'}</Button
+			disabled={!passphrase}
 		>
+			{unlocking ? 'Unlocking…' : 'Unlock'}
+		</Button>
 	{/snippet}
 </Dialog>
 
@@ -835,8 +859,9 @@ nepfleet control token</code
 				<ul>
 					{#each hostUpdates[setupFor.name]!.value!.news! as n, i (i)}
 						<li>
-							{#if n.link}<a href={n.link} target="_blank" rel="noopener noreferrer">{n.title}</a
-								>{:else}{n.title}{/if}
+							{#if n.link}<a href={n.link} target="_blank" rel="noopener noreferrer">
+									{n.title}
+								</a>{:else}{n.title}{/if}
 						</li>
 					{/each}
 				</ul>
@@ -864,10 +889,10 @@ nepfleet control token</code
 						if (e.key === 'Enter' && sudoPassword) void runSetup();
 					}}
 				/>
-				<span class="muted"
-					>For the steps marked as root, this run only. It's sent over SSH to sudo on the machine,
-					and kept nowhere.</span
-				>
+				<span class="muted">
+					For the steps marked as root, this run only. It's sent over SSH to sudo on the machine,
+					and kept nowhere.
+				</span>
 			</label>
 		{/if}
 	{/if}
@@ -895,16 +920,18 @@ nepfleet control token</code
 				onclick={() => {
 					setupOpen = false;
 					if (setupFor) void act(setupFor, 'connect');
-				}}>Connect</Button
+				}}
 			>
+				Connect
+			</Button>
 		{:else if setupPlan?.id && !setupRunning && setupJob?.state !== 'succeeded'}
-			<Button variant="primary" onclick={runSetup} disabled={needsPassword && !sudoPassword}
-				>Run this plan</Button
-			>
+			<Button variant="primary" onclick={runSetup} disabled={needsPassword && !sudoPassword}>
+				Run this plan
+			</Button>
 		{:else if setupPlan?.id && setupJob?.state === 'succeeded'}
-			<Button variant="primary" onclick={runSetup} disabled={needsPassword && !sudoPassword}
-				>Run the next plan</Button
-			>
+			<Button variant="primary" onclick={runSetup} disabled={needsPassword && !sudoPassword}>
+				Run the next plan
+			</Button>
 		{/if}
 	{/snippet}
 </Dialog>

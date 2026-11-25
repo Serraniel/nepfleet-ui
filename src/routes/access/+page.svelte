@@ -163,18 +163,18 @@
 		<h2 id="new-h">New token</h2>
 		<form onsubmit={create}>
 			{#if connected.length > 1}
-				<label
-					>Backend
+				<label>
+					Backend
 					<select bind:value={backendId}>
-						{#each connected as b (b.id)}<option value={b.id}
-								>{b.label ?? new URL(b.url).host}</option
-							>{/each}
+						{#each connected as b (b.id)}<option value={b.id}>
+								{b.label ?? new URL(b.url).host}
+							</option>{/each}
 					</select>
 				</label>
 			{/if}
 			<TextField label="Name" bind:value={name} hint="What it's for, e.g. ci" maxlength={64} />
-			<label
-				>Scope
+			<label>
+				Scope
 				<select bind:value={scope}>
 					{#each scopes as s (s.value)}<option value={s.value}>{s.what}</option>{/each}
 				</select>
@@ -189,8 +189,10 @@
 			<Button
 				type="submit"
 				variant="primary"
-				disabled={busy || !name.trim() || !!stacksError || !!daysError}>Create token</Button
+				disabled={busy || !name.trim() || !!stacksError || !!daysError}
 			>
+				Create token
+			</Button>
 		</form>
 	</section>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -223,11 +225,11 @@
 								<td>{t.scope}</td>
 								<td>{t.stacks?.length ? t.stacks.join(', ') : 'all'}</td>
 								<td>{t.expired ? 'expired' : date(t.expires)}</td>
-								<td
-									><Button variant="danger" disabled={busy} onclick={() => revoke(b.id, t)}
-										>Revoke</Button
-									></td
-								>
+								<td>
+									<Button variant="danger" disabled={busy} onclick={() => revoke(b.id, t)}>
+										Revoke
+									</Button>
+								</td>
 							</tr>
 						{/each}
 					</tbody>

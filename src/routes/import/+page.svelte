@@ -85,17 +85,16 @@
 		Add an API token for a backend on the <a href="/stacks">Stacks</a> page.
 	</EmptyState>
 {:else}
-	<label class="check"
-		><input type="checkbox" bind:checked={encryptAll} /> Encrypt every value, not only secret-looking
-		ones</label
-	>
+	<label class="check">
+		<input type="checkbox" bind:checked={encryptAll} /> Encrypt every value, not only secret-looking ones
+	</label>
 	{#if result}
 		<section class="result" aria-label="Imported">
 			<p role="status">
 				Imported as
-				<a href="/stacks/{encodeURIComponent(result.backend)}/{encodeURIComponent(result.stack)}"
-					>{result.stack}</a
-				>
+				<a href="/stacks/{encodeURIComponent(result.backend)}/{encodeURIComponent(result.stack)}">
+					{result.stack}
+				</a>
 				in <code>{result.commit.slice(0, 7)}</code>.
 			</p>
 			{#if result.log}<pre>{result.log}</pre>{/if}
@@ -127,8 +126,9 @@
 									disabled={busy !== ''}
 									busy={busy === b.id + '/' + p.name}
 									onclick={() => run(b.id, p.name)}
-									>{busy === b.id + '/' + p.name ? 'Importing…' : 'Import'}</Button
 								>
+									{busy === b.id + '/' + p.name ? 'Importing…' : 'Import'}
+								</Button>
 							{/if}
 						</li>
 					{/each}

@@ -198,9 +198,9 @@
 				{#each shown as s (s.backend + '/' + s.name)}
 					<tr>
 						<td>
-							<a href="/stacks/{encodeURIComponent(s.backend)}/{encodeURIComponent(s.name)}"
-								><strong>{s.name}</strong></a
-							>
+							<a href="/stacks/{encodeURIComponent(s.backend)}/{encodeURIComponent(s.name)}">
+								<strong>{s.name}</strong>
+							</a>
 						</td>
 						<td>{backendName(s.backend)}</td>
 						<td>{s.target}</td>

@@ -101,10 +101,10 @@
 		<p class="error">{loaded.error}</p>
 	{:else}
 		<p class="muted small">
-			Each route sends the events it matches to its channels. Events are names or patterns (<code
-				>apply.*</code
-			>, <code>update.available</code>); stacks limit it to those. Empty means all. A notification
-			goes to every route it matches.
+			Each route sends the events it matches to its channels. Events are names or patterns (<code>
+				apply.*
+			</code>, <code>update.available</code>); stacks limit it to those. Empty means all. A
+			notification goes to every route it matches.
 		</p>
 		{#if drafts.length === 0}
 			<p class="muted">No routes: nothing is sent.</p>
@@ -116,43 +116,43 @@
 						<legend>Route {i + 1}</legend>
 						<div class="chans">
 							{#each channels as c (c)}
-								<label
-									><input
+								<label>
+									<input
 										type="checkbox"
 										checked={d.channels.includes(c)}
 										onchange={(e) => toggle(d, c, e.currentTarget.checked)}
 									/>
-									<code>{c}</code></label
-								>
+									<code>{c}</code>
+								</label>
 							{/each}
 						</div>
-						<label
-							>Events
+						<label>
+							Events
 							<input
 								bind:value={d.events}
 								oninput={() => (dirty = true)}
 								placeholder="all"
 								spellcheck="false"
-							/></label
-						>
-						<label
-							>Stacks
+							/>
+						</label>
+						<label>
+							Stacks
 							<input
 								bind:value={d.stacks}
 								oninput={() => (dirty = true)}
 								placeholder="all"
 								spellcheck="false"
-							/></label
-						>
-						<label
-							>At least
+							/>
+						</label>
+						<label>
+							At least
 							<select bind:value={d.minSeverity} onchange={() => (dirty = true)}>
 								<option value="">any severity</option>
 								<option value="info">info</option>
 								<option value="warning">warning</option>
 								<option value="error">error</option>
-							</select></label
-						>
+							</select>
+						</label>
 						<Button variant="ghost" onclick={() => remove(i)}>Remove route</Button>
 					</fieldset>
 				</li>

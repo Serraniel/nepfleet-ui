@@ -76,9 +76,9 @@
 	{:else}
 		<div class="row">
 			<p class="muted" role="status">{local.unread} unread</p>
-			<Button onclick={() => local.markAllRead()} disabled={local.unread === 0}
-				>Mark all read</Button
-			>
+			<Button onclick={() => local.markAllRead()} disabled={local.unread === 0}>
+				Mark all read
+			</Button>
 		</div>
 		<ul class="events">
 			{#each newest as e (e.id)}

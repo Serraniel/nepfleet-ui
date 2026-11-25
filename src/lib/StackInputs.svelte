@@ -158,9 +158,9 @@
 			{/if}
 			{#if others.length > 0}
 				<details open={missing.length === 0 ? undefined : false}>
-					<summary
-						>{missing.length > 0 ? 'Other settings' : 'Change settings'} ({others.length})</summary
-					>
+					<summary>
+						{missing.length > 0 ? 'Other settings' : 'Change settings'} ({others.length})
+					</summary>
 					{#each others as i (i.name)}{@render field(i)}{/each}
 				</details>
 			{/if}
@@ -169,8 +169,9 @@
 				type="submit"
 				{busy}
 				disabled={!dirty || (missing.length > 0 && !missingFilled)}
-				>{busy ? 'Saving… (waits for a running apply)' : 'Save'}</Button
 			>
+				{busy ? 'Saving… (waits for a running apply)' : 'Save'}
+			</Button>
 		</form>
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		{#if done}<p role="status">{done}</p>{/if}

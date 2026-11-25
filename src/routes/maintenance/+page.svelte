@@ -90,14 +90,14 @@
 						<ul class="windows">
 							{#each shown as w (w.id)}
 								<li>
-									<span class="badge" class:active={w.status === 'under-maintenance'}
-										>{w.status === 'under-maintenance' ? 'now' : 'scheduled'}</span
-									>
+									<span class="badge" class:active={w.status === 'under-maintenance'}>
+										{w.status === 'under-maintenance' ? 'now' : 'scheduled'}
+									</span>
 									<strong>{w.title}</strong>
-									{#if w.start}<span class="muted"
-											>{when(w.start)}{#if w.end}
-												– {when(w.end)}{/if}</span
-										>{/if}
+									{#if w.start}<span class="muted">
+											{when(w.start)}{#if w.end}
+												– {when(w.end)}{/if}
+										</span>{/if}
 									{#if w.description}<span class="muted">{w.description}</span>{/if}
 								</li>
 							{/each}

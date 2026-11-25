@@ -107,15 +107,15 @@
 			<Button variant="ghost" disabled={busy} onclick={another}>Add a passkey</Button>
 		{/if}
 		{#if status.totp}
-			<Button variant="ghost" disabled={busy} onclick={() => act(() => removeCodes(backend))}
-				>Turn off sign-in codes</Button
-			>
+			<Button variant="ghost" disabled={busy} onclick={() => act(() => removeCodes(backend))}>
+				Turn off sign-in codes
+			</Button>
 		{:else if !codeSetup && !status.external}
 			<Button variant="ghost" disabled={busy} onclick={startCodes}>Set up sign-in codes</Button>
 		{/if}
-		<Button variant="ghost" disabled={busy} onclick={() => act(() => signOut(backend))}
-			>Sign out</Button
-		>
+		<Button variant="ghost" disabled={busy} onclick={() => act(() => signOut(backend))}>
+			Sign out
+		</Button>
 	</div>
 	{#if added}<p class="muted" role="status">Passkey added.</p>{/if}
 	{#if codeSetup}

@@ -38,32 +38,34 @@
 		</a>
 		<nav aria-label="Main">
 			<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Backends</a>
-			<a href="/fleets" aria-current={page.url.pathname === '/fleets' ? 'page' : undefined}
-				>Fleets</a
-			>
-			<a href="/stacks" aria-current={page.url.pathname === '/stacks' ? 'page' : undefined}
-				>Stacks</a
-			>
-			<a href="/templates" aria-current={page.url.pathname === '/templates' ? 'page' : undefined}
-				>Templates</a
-			>
-			<a href="/features" aria-current={page.url.pathname === '/features' ? 'page' : undefined}
-				>Features</a
-			>
-			<a href="/updates" aria-current={page.url.pathname === '/updates' ? 'page' : undefined}
-				>Updates</a
-			>
+			<a href="/fleets" aria-current={page.url.pathname === '/fleets' ? 'page' : undefined}>
+				Fleets
+			</a>
+			<a href="/stacks" aria-current={page.url.pathname === '/stacks' ? 'page' : undefined}>
+				Stacks
+			</a>
+			<a href="/templates" aria-current={page.url.pathname === '/templates' ? 'page' : undefined}>
+				Templates
+			</a>
+			<a href="/features" aria-current={page.url.pathname === '/features' ? 'page' : undefined}>
+				Features
+			</a>
+			<a href="/updates" aria-current={page.url.pathname === '/updates' ? 'page' : undefined}>
+				Updates
+			</a>
 			<a href="/sync" aria-current={page.url.pathname === '/sync' ? 'page' : undefined}>Sync</a>
 			<a
 				href="/maintenance"
-				aria-current={page.url.pathname === '/maintenance' ? 'page' : undefined}>Maintenance</a
+				aria-current={page.url.pathname === '/maintenance' ? 'page' : undefined}
 			>
-			<a href="/health" aria-current={page.url.pathname === '/health' ? 'page' : undefined}
-				>Health</a
-			>
-			<a href="/access" aria-current={page.url.pathname === '/access' ? 'page' : undefined}
-				>Access</a
-			>
+				Maintenance
+			</a>
+			<a href="/health" aria-current={page.url.pathname === '/health' ? 'page' : undefined}>
+				Health
+			</a>
+			<a href="/access" aria-current={page.url.pathname === '/access' ? 'page' : undefined}>
+				Access
+			</a>
 			<a
 				href="/notifications"
 				aria-current={page.url.pathname === '/notifications' ? 'page' : undefined}
@@ -89,12 +91,12 @@
 					</label>
 				{/each}
 			</fieldset>
-			<small
-				>v{__APP_VERSION__} ·
-				<a href="/design" aria-current={page.url.pathname === '/design' ? 'page' : undefined}
-					>Design system</a
-				></small
-			>
+			<small>
+				v{__APP_VERSION__} ·
+				<a href="/design" aria-current={page.url.pathname === '/design' ? 'page' : undefined}>
+					Design system
+				</a>
+			</small>
 		</footer>
 	</aside>
 	<main>

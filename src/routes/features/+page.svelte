@@ -84,9 +84,9 @@
 								<td>
 									{#if f.stacks.length}
 										On:
-										{#each f.stacks as s, i (s)}{i > 0 ? ', ' : ''}<a href={stackHref(b.id, s)}
-												>{s}</a
-											>{/each}
+										{#each f.stacks as s, i (s)}{i > 0 ? ', ' : ''}<a href={stackHref(b.id, s)}>
+												{s}
+											</a>{/each}
 									{:else}
 										<a href={enableHref(b.id, f)}>Enable…</a>
 									{/if}
