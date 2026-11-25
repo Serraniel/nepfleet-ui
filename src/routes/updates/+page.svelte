@@ -4,6 +4,7 @@
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
+	import ApplyAll from '#lib/ApplyAll.svelte';
 	import UpdatesRun from '#lib/UpdatesRun.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -75,7 +76,8 @@
 	<h1>Updates</h1>
 	<p>
 		What the registries have for every stack's images. "Review and take…" opens the stack's plan
-		with the update, to apply like any change.
+		with the update, to apply like any change. Stacks set to apply by hand list their pending
+		changes, to apply all at once.
 	</p>
 </header>
 
@@ -98,6 +100,7 @@
 				/>{/if}
 		{/each}
 	</section>
+	<ApplyAll {label} />
 	<h2>What's new</h2>
 	<Button onclick={checkAll} busy={checking}>
 		{checking ? 'Checking…' : rows.length ? 'Check again' : 'Check every stack'}
