@@ -1,13 +1,14 @@
 <script lang="ts">
 	import Spinner from '#lib/ui/Spinner.svelte';
-	import { fetchChannels, setChannel, testChannel } from '#lib/backend.ts';
+	import { type ChannelList, fetchChannelList, setChannel, testChannel } from '#lib/backend.ts';
+	import { deliveryText } from '#lib/notify-setup.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import ChannelAdd from '#lib/ChannelAdd.svelte';
 	import RoutesEditor from '#lib/RoutesEditor.svelte';
 
-	let byBackend = $state<Record<string, string[] | null | { error: string }>>({});
+	let byBackend = $state<Record<string, ChannelList | null | { error: string }>>({});
 	let result = $state<Record<string, { ok: boolean; text: string }>>({});
 	let sending = $state<Record<string, boolean>>({});
 
@@ -28,7 +29,7 @@
 		const b = backends.list.find((x) => x.id === id);
 		const token = tokens.byBackend[id];
 		if (!b || !token) return;
-		fetchChannels(b, token).then(
+		fetchChannelList(b, token).then(
 			(cs) => (byBackend[id] = cs),
 			(e: unknown) => (byBackend[id] = { error: e instanceof Error ? e.message : String(e) })
 		);
@@ -82,6 +83,7 @@
 			result[k] = { ok: false, text: e instanceof Error ? e.message : String(e) };
 		} finally {
 			sending[k] = false;
+			load(id); // the test is now the last delivery
 		}
 	}
 </script>
@@ -95,7 +97,8 @@
 			message to check one.
 		</p>
 		{#each connected as b (b.id)}
-			{@const cs = byBackend[b.id]}
+			{@const list = byBackend[b.id]}
+			{@const cs = list && !('error' in list) ? list.channels : list}
 			<h3>{b.label ?? new URL(b.url).host}</h3>
 			{#if cs === undefined}
 				<p><Spinner label="Loading…" /></p>
@@ -109,8 +112,12 @@
 				<ul class="channels">
 					{#each cs as c (c)}
 						{@const r = result[`${b.id}/${c}`]}
+						{@const d = list && !('error' in list) ? deliveryText(list.deliveries[c]) : undefined}
 						<li>
 							<code>{c}</code>
+							{#if d}<span class="delivery" class:error={!d.ok} class:muted={d.ok}>
+									{d.text}
+								</span>{/if}
 							<Button busy={sending[`${b.id}/${c}`]} onclick={() => test(b.id, c)}>
 								Send test
 							</Button>
@@ -149,6 +156,9 @@
 		gap: 0.5rem;
 		align-items: center;
 		padding: 0.15rem 0;
+	}
+	.delivery {
+		font-size: 0.9em;
 	}
 	.muted {
 		color: var(--muted);

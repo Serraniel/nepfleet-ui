@@ -1,7 +1,8 @@
 <script lang="ts">
 	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onMount } from 'svelte';
-	import { type Feature, fetchChannels, fetchFeatures } from '#lib/backend.ts';
+	import { type ChannelList, type Feature, fetchChannelList, fetchFeatures } from '#lib/backend.ts';
+	import { deliveryText } from '#lib/notify-setup.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
@@ -15,7 +16,7 @@
 
 	let byBackend = $state<Record<string, Load>>({});
 	// Notification channels by name; null from a backend too old to list them.
-	let channelsBy = $state<Record<string, string[] | null | { error: string }>>({});
+	let channelsBy = $state<Record<string, ChannelList | null | { error: string }>>({});
 
 	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
 
@@ -25,7 +26,7 @@
 		if (!b || !token) return;
 		byBackend[id] = { state: 'loading' };
 		delete channelsBy[id];
-		fetchChannels(b, token).then(
+		fetchChannelList(b, token).then(
 			(cs) => (channelsBy[id] = cs),
 			(e: unknown) => (channelsBy[id] = { error: e instanceof Error ? e.message : String(e) })
 		);
@@ -68,7 +69,8 @@
 	<Button onclick={loadAll}>Refresh</Button>
 	{#each connected as b (b.id)}
 		{@const st = byBackend[b.id]}
-		{@const cs = channelsBy[b.id]}
+		{@const list = channelsBy[b.id]}
+		{@const cs = list && !('error' in list) ? list.channels : list}
 		<section aria-label={b.label ?? b.url}>
 			<h2>{b.label ?? new URL(b.url).host}</h2>
 			{#if !st || st.state === 'loading'}
@@ -124,7 +126,14 @@
 							No channels yet: nothing is sent.
 						{:else}
 							{cs.length}
-							{cs.length === 1 ? 'channel' : 'channels'}: {cs.join(', ')}
+							{cs.length === 1 ? 'channel' : 'channels'}:
+							{#each cs as c, i (c)}
+								{@const d =
+									list && !('error' in list) ? deliveryText(list.deliveries[c]) : undefined}
+								{i > 0 ? ', ' : ''}{c}{#if d}{' '}<span class:error={!d.ok} class:muted={d.ok}>
+										({d.text})
+									</span>{/if}
+							{/each}
 						{/if}
 					</p>
 				</div>

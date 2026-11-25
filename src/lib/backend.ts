@@ -1264,6 +1264,74 @@ export async function fetchFeatures(
 	}
 }
 
+/** A channel's last send attempt: when, whether it went out, why not (no URLs). */
+export type ChannelDelivery = {
+	at: string;
+	ok: boolean;
+	error?: string;
+	/** The last attempt that went out, if any. */
+	delivered?: string;
+};
+
+export type ChannelList = {
+	channels: string[];
+	/** By channel name; a channel not sent to yet, or a backend too old to record them, has none. */
+	deliveries: Record<string, ChannelDelivery>;
+};
+
+function isChannelDelivery(v: unknown): v is ChannelDelivery {
+	if (typeof v !== 'object' || v === null) return false;
+	const d = v as Record<string, unknown>;
+	return (
+		typeof d.at === 'string' &&
+		typeof d.ok === 'boolean' &&
+		(d.error === undefined || typeof d.error === 'string') &&
+		(d.delivered === undefined || typeof d.delivered === 'string')
+	);
+}
+
+function isChannelList(v: unknown): v is { channels: string[]; deliveries?: unknown } {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return (
+		Array.isArray(o.channels) &&
+		o.channels.every((c) => typeof c === 'string') &&
+		(o.deliveries === undefined ||
+			(typeof o.deliveries === 'object' &&
+				o.deliveries !== null &&
+				Object.values(o.deliveries).every(isChannelDelivery)))
+	);
+}
+
+/**
+ * The notification channels of a backend's fleet.yaml, by name, with each
+ * one's last delivery; null on an older backend.
+ */
+export async function fetchChannelList(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 30000
+): Promise<ChannelList | null> {
+	try {
+		const o = await apiGet(
+			backend,
+			token,
+			'/api/v1/notifications/channels',
+			isChannelList,
+			fetcher,
+			timeoutMs
+		);
+		return {
+			channels: o.channels,
+			deliveries: (o.deliveries ?? {}) as Record<string, ChannelDelivery>
+		};
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}
+
 /** The notification channels of a backend's fleet.yaml, by name; null on an older backend. */
 export async function fetchChannels(
 	backend: Backend,
@@ -1271,24 +1339,7 @@ export async function fetchChannels(
 	fetcher: typeof fetch = fetch,
 	timeoutMs = 30000
 ): Promise<string[] | null> {
-	try {
-		const o = await apiGet(
-			backend,
-			token,
-			'/api/v1/notifications/channels',
-			(v: unknown): v is { channels: string[] } =>
-				typeof v === 'object' &&
-				v !== null &&
-				Array.isArray((v as Record<string, unknown>).channels) &&
-				((v as Record<string, unknown>).channels as unknown[]).every((c) => typeof c === 'string'),
-			fetcher,
-			timeoutMs
-		);
-		return o.channels;
-	} catch (e) {
-		if (e instanceof NotFoundError) return null;
-		throw e;
-	}
+	return (await fetchChannelList(backend, token, fetcher, timeoutMs))?.channels ?? null;
 }
 
 /** Sends a channel a test message (admin scope). Throws with the reason when it fails. */

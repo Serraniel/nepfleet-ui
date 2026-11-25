@@ -1,6 +1,41 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { PRESETS, applyPreset, isNtfyStack, ntfyUrl, randomTopic } from './notify-setup.ts';
+import {
+	PRESETS,
+	applyPreset,
+	deliveryText,
+	isNtfyStack,
+	ntfyUrl,
+	randomTopic
+} from './notify-setup.ts';
+
+describe('deliveryText', () => {
+	const now = Date.parse('2026-11-07T12:00:00Z');
+	it('says when a channel last delivered, or why it failed', () => {
+		expect(deliveryText(undefined, now)).toBeUndefined();
+		expect(deliveryText({ at: '2026-11-07T11:55:00Z', ok: true }, now)).toEqual({
+			ok: true,
+			text: 'last delivered 5 min ago'
+		});
+		expect(
+			deliveryText(
+				{
+					at: '2026-11-07T10:00:00Z',
+					ok: false,
+					error: '401 Unauthorized',
+					delivered: '2026-11-05T12:00:00Z'
+				},
+				now
+			)
+		).toEqual({
+			ok: false,
+			text: 'last attempt failed 2 h ago (last delivered 2 days ago): 401 Unauthorized'
+		});
+		expect(deliveryText({ at: '2026-11-07T11:59:30Z', ok: false }, now)?.text).toBe(
+			'last attempt failed just now'
+		);
+	});
+});
 
 const stack = (template?: string) => ({
 	name: 's',

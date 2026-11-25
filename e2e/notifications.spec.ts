@@ -15,7 +15,8 @@ async function mockBackend(page: Page, stacks: Record<string, unknown>[]) {
 		channels: [] as string[],
 		puts: [] as { name: string; url: string; minSeverity: string }[],
 		routes: [{ channels: ['chat'], events: ['apply.*'], stacks: [] }] as Routes,
-		tests: [] as string[]
+		tests: [] as string[],
+		deliveries: {} as Record<string, { at: string; ok: boolean; delivered?: string }>
 	};
 	await page.route(BACKEND + '/**', async (route: Route) => {
 		const req = route.request();
@@ -32,7 +33,8 @@ async function mockBackend(page: Page, stacks: Record<string, unknown>[]) {
 		if (path === '/api/v1/info') return json({ name: 'b', version: '1', apiVersion: 'v1' });
 		if (path === '/api/v1/features') return json([]);
 		if (path === '/api/v1/stacks') return json(stacks);
-		if (path === '/api/v1/notifications/channels') return json({ channels: seen.channels });
+		if (path === '/api/v1/notifications/channels')
+			return json({ channels: seen.channels, deliveries: seen.deliveries });
 		const ch = /^\/api\/v1\/notifications\/channels\/([^/]+)(\/test)?$/.exec(path);
 		if (ch && req.method() === 'PUT') {
 			const name = decodeURIComponent(ch[1] ?? '');
@@ -44,7 +46,10 @@ async function mockBackend(page: Page, stacks: Record<string, unknown>[]) {
 			return json({ commit: 'abc1234def' });
 		}
 		if (ch?.[2] && req.method() === 'POST') {
-			seen.tests.push(decodeURIComponent(ch[1] ?? ''));
+			const name = decodeURIComponent(ch[1] ?? '');
+			seen.tests.push(name);
+			const at = new Date().toISOString();
+			seen.deliveries[name] = { at, ok: true, delivered: at };
 			return route.fulfill({ status: 204, headers: cors });
 		}
 		if (path === '/api/v1/notifications/routes' && req.method() === 'GET')
@@ -110,6 +115,10 @@ test('Features leads through an ntfy channel in the fleet, its routes and a test
 	// The wizard ends on the Notifications page.
 	await page.getByRole('link', { name: 'Done: see notifications' }).click();
 	await expect(page).toHaveURL(/\/notifications$/);
+	// The test is the channel's last delivery.
+	await expect(page.getByText('last delivered just now')).toBeVisible();
+	await page.goto('/features');
+	await expect(card).toContainText('ntfy (last delivered just now)');
 });
 
 test('Without an ntfy stack, it offers to create one or use another server', async ({ page }) => {
