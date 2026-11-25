@@ -86,9 +86,16 @@
 			{:else}
 				{@const s = st.value}
 				{#if !s.enabled}
+					<!-- The API doesn't say whether the fleet repository has a remote, and a
+					     fleet installed from the app has none: say what happens, not what's
+					     missing. -->
+					<p>
+						This server doesn't pull from a remote. Changes made in the app are committed on the
+						server and apply from there.
+					</p>
 					<p class="muted">
-						This server doesn't sync. Start it with <code>nepfleet serve --sync 5m</code> (and
-						<code>NEPFLEET_SYNC_SECRET</code> for webhooks).
+						If its fleet repository has a remote in a forge, <code>nepfleet serve --sync 5m</code>
+						keeps it at that remote's commit (and <code>NEPFLEET_SYNC_SECRET</code> pulls on webhooks).
 					</p>
 				{:else}
 					<dl>
