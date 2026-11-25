@@ -85,10 +85,28 @@
 				<p class="error" role="alert">{st.error}</p>
 			{:else}
 				{@const s = st.value}
-				{#if !s.enabled}
-					<!-- The API doesn't say whether the fleet repository has a remote, and a
-					     fleet installed from the app has none: say what happens, not what's
-					     missing. -->
+				{#if !s.enabled && s.remote === false}
+					<p>
+						The fleet repository lives on this server only. Changes made here apply directly. To
+						keep it in a forge too (and edit it with git), add a remote.
+					</p>
+					<p class="muted">Setting up a mirror from the app is planned.</p>
+				{:else if !s.enabled && s.remote}
+					<!-- The server can't change its own serve flags from the app yet: say
+					     what to change and where. -->
+					<p>
+						The fleet repository has a remote{#if s.remoteUrl}, <code>{s.remoteUrl}</code>{/if}, but
+						this server doesn't sync from it: changes pushed there don't reach this server.
+					</p>
+					<p class="muted">
+						To turn sync on, add <code>--sync 5m</code> to the <code>nepfleet serve</code> command
+						in the server's <code>compose.yaml</code> (or its service unit) and restart it. Set
+						<code>NEPFLEET_SYNC_SECRET</code> as well to pull on a forge's webhooks.
+					</p>
+				{:else if !s.enabled}
+					<!-- An older server doesn't say whether the fleet repository has a remote,
+					     and a fleet installed from the app has none: say what happens, not
+					     what's missing. -->
 					<p>
 						This server doesn't pull from a remote. Changes made in the app are committed on the
 						server and apply from there.

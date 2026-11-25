@@ -989,6 +989,10 @@ export interface SyncStatus {
 	applied?: string[];
 	failed?: string[];
 	pending?: string[];
+	/** Whether the fleet repository has a git remote, sync on or off; absent on older servers. */
+	remote?: boolean;
+	/** That remote, without credentials. */
+	remoteUrl?: string;
 }
 
 const isNames = (v: unknown) =>
@@ -1000,6 +1004,8 @@ function isSyncStatus(v: unknown): v is SyncStatus {
 	return (
 		typeof o.enabled === 'boolean' &&
 		(o.error === undefined || typeof o.error === 'string') &&
+		(o.remote === undefined || typeof o.remote === 'boolean') &&
+		(o.remoteUrl === undefined || typeof o.remoteUrl === 'string') &&
 		isNames(o.applied) &&
 		isNames(o.failed) &&
 		isNames(o.pending)
