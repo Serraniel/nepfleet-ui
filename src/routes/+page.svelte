@@ -112,9 +112,12 @@
 		margin: 1.5rem 0 0;
 		display: grid;
 		gap: 1rem;
-		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		/* min() keeps a single column from overflowing a narrow window. */
+		grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
 	}
 	.card {
+		/* Grid items default to min-width: auto and grow with long content. */
+		min-width: 0;
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: calc(var(--radius) + 4px);
@@ -126,6 +129,12 @@
 	.card p {
 		margin: 0;
 	}
+	/* Long addresses and names (e.g. a local remote's proxy URL) wrap
+	   inside the card instead of running past its edge. */
+	.card strong,
+	.card code {
+		overflow-wrap: anywhere;
+	}
 	.row {
 		display: flex;
 		align-items: center;
@@ -133,8 +142,10 @@
 	}
 	.actions {
 		margin-top: 0.5rem;
+		flex-wrap: wrap;
 	}
 	.dot {
+		flex-shrink: 0;
 		width: 9px;
 		height: 9px;
 		border-radius: 50%;
