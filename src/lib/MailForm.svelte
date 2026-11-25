@@ -17,6 +17,7 @@
 
 	type Props = { backend: Backend; token: string; label: string };
 	let { backend, token, label }: Props = $props();
+	const uid = $props.id();
 
 	const defaultPort: Record<MailTLS, number> = { starttls: 587, tls: 465, none: 25 };
 
@@ -161,14 +162,15 @@
 			spellcheck="false"
 			required
 		/>
-		<label class="select">
-			<span>Encryption</span>
-			<select bind:value={tls}>
+		<div class="select">
+			<!-- Labelled by id: a wrapping label would add the chosen option to its name. -->
+			<label for="mail-tls-{uid}">Encryption</label>
+			<select id="mail-tls-{uid}" bind:value={tls}>
 				<option value="starttls">STARTTLS (port 587)</option>
 				<option value="tls">TLS (port 465)</option>
 				<option value="none">None (a relay on the same network)</option>
 			</select>
-		</label>
+		</div>
 		<TextField
 			label="Port"
 			bind:value={port}
@@ -261,7 +263,7 @@
 		gap: var(--space-1);
 		min-width: 0;
 	}
-	.select span {
+	.select label {
 		font-weight: 600;
 		font-size: 0.9rem;
 	}

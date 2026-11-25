@@ -73,7 +73,7 @@ test('mail settings: saved with a write-only password, then a test mail', async 
 
 	await form.getByLabel('SMTP server').fill('smtp.example.test');
 	await form.getByLabel('Encryption').selectOption('tls');
-	await expect(form.getByLabel('Port')).toHaveAttribute('placeholder', '465');
+	await expect(form.getByLabel('Port', { exact: true })).toHaveAttribute('placeholder', '465');
 	await form.getByLabel('User').fill('fleet@example.test');
 	await form.getByLabel('Password', { exact: true }).fill('s3cret-pw');
 	await form.getByLabel('From').fill('NepFleet <fleet@example.test>');
@@ -90,7 +90,7 @@ test('mail settings: saved with a write-only password, then a test mail', async 
 	// The password is never shown again; saving without one keeps it.
 	await expect(form.getByLabel('Password', { exact: true })).toHaveValue('');
 	await expect(form.getByText('Stored. Leave empty to keep it.')).toBeVisible();
-	await form.getByLabel('Port').fill('2465');
+	await form.getByLabel('Port', { exact: true }).fill('2465');
 	await form.getByRole('button', { name: 'Save mail settings' }).click();
 	await expect.poll(() => saved.length).toBe(2);
 	expect(saved[1]).not.toHaveProperty('password');
