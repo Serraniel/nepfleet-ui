@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { type DoctorReport, dnsDomain, fetchDoctor } from '#lib/backend.ts';
 	import DNSRecordsFix from '#lib/DNSRecordsFix.svelte';
+	import KeyBackup from '#lib/KeyBackup.svelte';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
@@ -15,6 +16,24 @@
 		| { state: 'error'; error: string };
 
 	let byBackend = $state<Record<string, Load>>({});
+	// The key backup form, opened from the Key copy warning, and the note that
+	// stays after it worked (the check runs again and the warning goes).
+	let keyOpen = $state<Record<string, boolean>>({});
+	let keySaved = $state<Record<string, boolean>>({});
+
+	type Check = DoctorReport['checks'][number];
+	// Backends before the key-backup action say it only in words.
+	const offersKeyBackup = (c: Check) =>
+		c.action === 'key-backup' ||
+		(c.name === 'Key copy' &&
+			c.status === 'warn' &&
+			c.detail.startsWith('no copy of the age key is known'));
+
+	function keyBackedUp(id: string) {
+		keySaved[id] = true;
+		keyOpen[id] = false;
+		void run(id);
+	}
 
 	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
 
@@ -62,6 +81,10 @@
 		<section aria-label={b.label ?? b.url}>
 			<h2>{b.label ?? new URL(b.url).host}</h2>
 			<Button busy={st?.state === 'loading'} onclick={() => run(b.id)}>Check again</Button>
+			{#if keySaved[b.id]}<p role="status">
+					Downloaded <code>nepfleet-age-key.age</code>, and the backend recorded the copy. Move the
+					file off this computer's downloads folder to where you keep backups.
+				</p>{/if}
 			{#if !st || st.state === 'loading'}
 				<p class="muted" role="status">Checking the host…</p>
 			{:else if st.state === 'error'}
@@ -79,10 +102,23 @@
 							<span class="badge">{label[c.status]}</span>
 							<strong>{c.name}</strong>
 							<span>{c.detail}</span>
+							{#if offersKeyBackup(c)}<Button
+									aria-expanded={!!keyOpen[b.id]}
+									onclick={() => (keyOpen[b.id] = !keyOpen[b.id])}
+								>
+									Back up the key…
+								</Button>{/if}
 							{#if c.fix && c.status !== 'ok'}<span class="fix">→ {c.fix}</span>{/if}
 						</li>
 					{/each}
 				</ul>
+				{#if keyOpen[b.id] && r.checks.some(offersKeyBackup)}
+					<KeyBackup
+						backend={b}
+						token={tokens.byBackend[b.id] ?? ''}
+						ondone={() => keyBackedUp(b.id)}
+					/>
+				{/if}
 				{@const dns = r.checks.find((c) => c.action === 'dns-records')}
 				{#if dns}
 					<DNSRecordsFix
