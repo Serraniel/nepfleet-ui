@@ -8,6 +8,7 @@
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import SignOnCard from '#lib/SignOnCard.svelte';
 
 	type Load =
 		| { state: 'loading' }
@@ -144,6 +145,7 @@
 					<a href="/notifications">Channels and routes</a>
 				</p>
 			</div>
+			<SignOnCard backend={b} token={tokens.byBackend[b.id] ?? ''} backendId={b.id} />
 		</section>
 	{/each}
 {/if}

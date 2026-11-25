@@ -3,12 +3,18 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import {
+		type NewStack,
+		type SignOnMode,
+		type SignOnSettings,
 		type SourceCatalogue,
 		type TemplateEntry,
 		VerifyFirstError,
 		createStack,
+		fetchSignOn,
 		fetchTemplates
 	} from '#lib/backend.ts';
+	import { defaultSignOn, hiddenBySignOn, issuerError, signOnLabels } from '#lib/signon.ts';
+	import TextField from '#lib/ui/TextField.svelte';
 	import { verifyIdentity } from '#lib/login.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import {
@@ -41,6 +47,14 @@
 	let access = $state<'domain' | 'port'>('domain');
 	let creating = $state(false);
 	let createError = $state('');
+	// The fleet's sign-on; null when the backend can't say (too old, busy):
+	// then the wizard offers no choice and the backend's default applies.
+	let fleetSignOn = $state<SignOnSettings | null>(null);
+	let signOn = $state<SignOnMode>('none');
+	let oidcIssuer = $state('');
+	let oidcClientID = $state('');
+	// Write-only, as the secret inputs.
+	let oidcSecret = $state('');
 
 	const withToken = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
 
@@ -65,6 +79,8 @@
 		error = '';
 		try {
 			catalogues = await fetchTemplates(b, token);
+			// After the catalogue: both wait for the backend's lock.
+			fleetSignOn = await fetchSignOn(b, token).catch(() => null);
 			if (wanted) {
 				const hit = catalogues
 					.filter((c) => c.source === 'official')
@@ -135,13 +151,35 @@
 		access = 'domain';
 		createError = '';
 		copied = false;
+		signOn = defaultSignOn(!!fleetSignOn?.provider, !!e.t.oidc);
+		oidcIssuer = oidcClientID = oidcSecret = '';
 	}
 
 	$effect(() => {
 		if (!picked) secretValues = {};
+		if (!picked) oidcSecret = '';
 	});
 
-	const inputs = $derived(picked?.t.inputs ?? []);
+	// Sign-on is offered for templates that support it, by a backend that knows it.
+	const offerSignOn = $derived(!!picked?.t.oidc && fleetSignOn !== null);
+	const signOnDefault = $derived(defaultSignOn(!!fleetSignOn?.provider, !!picked?.t.oidc));
+	const signOnChoices = $derived(
+		(['integrated', 'custom', 'none'] as SignOnMode[]).filter(
+			(m) => m !== 'integrated' || !!fleetSignOn?.provider
+		)
+	);
+	const issuerErr = $derived(
+		offerSignOn && signOn === 'custom' && oidcIssuer ? issuerError(oidcIssuer) : ''
+	);
+	const signOnValid = $derived(
+		!offerSignOn ||
+			signOn !== 'custom' ||
+			(!!oidcIssuer.trim() && !issuerErr && !!oidcClientID.trim() && !!oidcSecret)
+	);
+	// With sign-on NepFleet fills, the template's own OIDC settings are overrides: hidden.
+	const inputs = $derived(
+		(picked?.t.inputs ?? []).filter((i) => !(offerSignOn && hiddenBySignOn(i.name, signOn)))
+	);
 	const split = $derived(splitInputs(inputs));
 	const errors = $derived(
 		Object.fromEntries(
@@ -169,9 +207,12 @@
 		creating = true;
 		createError = '';
 		const all: Record<string, string> = {};
-		for (const [k, v] of Object.entries(values)) if (v !== '') all[k] = v;
-		for (const [k, v] of Object.entries(secretValues)) if (v !== '') all[k] = v;
-		const req = {
+		// Only the inputs offered: hidden ones are sign-on's.
+		const shownNames = new Set(inputs.map((i) => i.name));
+		for (const [k, v] of Object.entries(values)) if (v !== '' && shownNames.has(k)) all[k] = v;
+		for (const [k, v] of Object.entries(secretValues))
+			if (v !== '' && shownNames.has(k)) all[k] = v;
+		const req: NewStack = {
 			template: picked.t.name,
 			source: picked.source,
 			name: stackName,
@@ -179,6 +220,17 @@
 			access,
 			values: all
 		};
+		// The default stays unwritten, so the stack follows the fleet's provider.
+		if (offerSignOn && signOn !== signOnDefault)
+			req.signOn =
+				signOn === 'custom'
+					? {
+							mode: signOn,
+							issuer: oidcIssuer.trim(),
+							clientID: oidcClientID.trim(),
+							clientSecret: oidcSecret
+						}
+					: { mode: signOn };
 		try {
 			let res;
 			try {
@@ -189,6 +241,7 @@
 				res = await createStack(b, token, req);
 			}
 			secretValues = {};
+			oidcSecret = '';
 			await goto(`/stacks/${encodeURIComponent(backendId)}/${encodeURIComponent(res.name)}`);
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
@@ -330,6 +383,54 @@
 						<option value="port">on a LAN port of the host (templates with a web UI)</option>
 					</select>
 				</div>
+				{#if offerSignOn}
+					<div class="field">
+						<label for="f-signon">Sign-on</label>
+						<select id="f-signon" bind:value={signOn} aria-describedby="h-signon">
+							{#each signOnChoices as m (m)}
+								<option value={m}>
+									{signOnLabels[m]}{m === signOnDefault ? ' (default)' : ''}
+								</option>
+							{/each}
+						</select>
+						<span id="h-signon" class="muted">
+							{#if signOn === 'integrated'}
+								NepFleet registers it in {fleetSignOn?.provider} and fills its sign-in settings.
+							{:else if signOn === 'custom'}
+								Register it at your provider with the callback path {t.oidc?.redirect} on its address.
+							{:else if fleetSignOn?.provider}
+								Its own accounts only, not {fleetSignOn.provider}.
+							{:else}
+								Its own accounts. A provider for every app is set up under <a href="/features">
+									Features
+								</a>.
+							{/if}
+						</span>
+					</div>
+					{#if signOn === 'custom'}
+						<TextField
+							label="Issuer"
+							bind:value={oidcIssuer}
+							placeholder="https://login.example.org"
+							autocomplete="off"
+							spellcheck="false"
+							error={issuerErr}
+						/>
+						<TextField
+							label="Client ID"
+							bind:value={oidcClientID}
+							autocomplete="off"
+							spellcheck="false"
+						/>
+						<TextField
+							label="Client secret"
+							type="password"
+							bind:value={oidcSecret}
+							autocomplete="new-password"
+							hint="Stored encrypted on the backend."
+						/>
+					{/if}
+				{/if}
 				{#each needs as n (n.name)}
 					<p class="needs" role="note">
 						{n.why}, and it isn't set up there yet.
@@ -381,7 +482,7 @@
 				<Button
 					variant="primary"
 					onclick={create}
-					disabled={!valid || secretsMissing}
+					disabled={!valid || secretsMissing || !signOnValid}
 					busy={creating}
 				>
 					{creating ? 'Creating…' : 'Create stack'}
@@ -394,6 +495,12 @@
 			{#if createError}<p class="error" role="alert">{createError}</p>{/if}
 			<h3>Or from the command line</h3>
 			<pre><code>{command}</code></pre>
+			{#if offerSignOn && signOn !== signOnDefault}
+				<p class="muted">
+					The command leaves sign-on out: add <code>signOn: {'{'}mode: {signOn}{'}'}</code> under
+					<code>spec</code> in its stack.yaml.
+				</p>
+			{/if}
 			<Button onclick={copy} disabled={!valid}>{copied ? 'Copied' : 'Copy command'}</Button>
 			{#if !valid}<p class="error" role="status">Fix the marked fields first.</p>{/if}
 			<p class="muted">
