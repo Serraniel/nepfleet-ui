@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Spinner from '#lib/ui/Spinner.svelte';
 	import { onMount } from 'svelte';
-	import { type Feature, fetchFeatures } from '#lib/backend.ts';
+	import { type Feature, fetchChannels, fetchFeatures } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
@@ -14,6 +14,8 @@
 		| { state: 'error'; error: string };
 
 	let byBackend = $state<Record<string, Load>>({});
+	// Notification channels by name; null from a backend too old to list them.
+	let channelsBy = $state<Record<string, string[] | null | { error: string }>>({});
 
 	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
 
@@ -22,6 +24,11 @@
 		const token = tokens.byBackend[id];
 		if (!b || !token) return;
 		byBackend[id] = { state: 'loading' };
+		delete channelsBy[id];
+		fetchChannels(b, token).then(
+			(cs) => (channelsBy[id] = cs),
+			(e: unknown) => (channelsBy[id] = { error: e instanceof Error ? e.message : String(e) })
+		);
 		try {
 			byBackend[id] = { state: 'ok', value: await fetchFeatures(b, token) };
 		} catch (e) {
@@ -39,6 +46,8 @@
 
 	const enableHref = (backend: string, f: Feature) =>
 		`/templates?backend=${encodeURIComponent(backend)}&template=${encodeURIComponent(f.template)}`;
+	const setupHref = (backend: string) =>
+		`/notifications/setup?backend=${encodeURIComponent(backend)}`;
 	const stackHref = (backend: string, s: string) =>
 		`/stacks/${encodeURIComponent(backend)}/${encodeURIComponent(s.split('@')[0] ?? s)}`;
 </script>
@@ -59,6 +68,7 @@
 	<Button onclick={loadAll}>Refresh</Button>
 	{#each connected as b (b.id)}
 		{@const st = byBackend[b.id]}
+		{@const cs = channelsBy[b.id]}
 		<section aria-label={b.label ?? b.url}>
 			<h2>{b.label ?? new URL(b.url).host}</h2>
 			{#if !st || st.state === 'loading'}
@@ -96,6 +106,35 @@
 					</tbody>
 				</table>
 			{/if}
+			<div class="card" role="group" aria-label="Notifications">
+				<div>
+					<h3>Notifications</h3>
+					<p class="muted">
+						Messages to your phone or chat when an apply fails, a container is unhealthy, a backup
+						fails or the host needs you. ntfy, Discord, Telegram, e-mail and more.
+					</p>
+					<p role="status">
+						{#if cs === undefined}
+							<Spinner label="Loading channels…" />
+						{:else if cs === null}
+							<span class="muted">This backend's NepFleet is too old for channels.</span>
+						{:else if 'error' in cs}
+							<span class="error">{cs.error}</span>
+						{:else if cs.length === 0}
+							No channels yet: nothing is sent.
+						{:else}
+							{cs.length}
+							{cs.length === 1 ? 'channel' : 'channels'}: {cs.join(', ')}
+						{/if}
+					</p>
+				</div>
+				<p class="links">
+					<a href={setupHref(b.id)}>
+						{Array.isArray(cs) && cs.length ? 'Add or change a channel…' : 'Set up notifications…'}
+					</a>
+					<a href="/notifications">Channels and routes</a>
+				</p>
+			</div>
 		</section>
 	{/each}
 {/if}
@@ -116,6 +155,27 @@
 	}
 	.muted {
 		color: var(--muted);
+	}
+	.card {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: end;
+		gap: 0.5rem 1.5rem;
+		margin: 1rem 0;
+		padding: 0.75rem 1rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: calc(var(--radius) + 4px);
+	}
+	.card h3,
+	.card p {
+		margin: 0 0 0.25rem;
+	}
+	.links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1rem;
 	}
 	.error {
 		color: var(--err);

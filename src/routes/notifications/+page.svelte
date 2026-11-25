@@ -47,6 +47,7 @@
 <header>
 	<h1>Notifications</h1>
 	<p>What happened across your connected fleets: applies, rollbacks, crashes and more.</p>
+	<p>To send it to your phone or chat, <a href="/notifications/setup">set up a channel</a>.</p>
 </header>
 
 {#if !local.connected}
