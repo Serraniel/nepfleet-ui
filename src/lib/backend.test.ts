@@ -36,6 +36,7 @@ import {
 	secretKeyPattern,
 	fetchFeatures,
 	fetchSBOM,
+	fetchChannelList,
 	fetchChannels,
 	testChannel,
 	fetchTokens,
@@ -730,6 +731,24 @@ describe('notification channels', () => {
 		const list = (async () =>
 			new Response(JSON.stringify({ channels: ['discord'] }))) as unknown as typeof fetch;
 		expect(await fetchChannels(backend, 't', list)).toEqual(['discord']);
+		expect(await fetchChannelList(backend, 't', list)).toEqual({
+			channels: ['discord'],
+			deliveries: {}
+		});
+		const delivery = { at: '2026-11-07T10:00:00Z', ok: false, error: '401 Unauthorized' };
+		const withDeliveries = (async () =>
+			new Response(
+				JSON.stringify({ channels: ['discord'], deliveries: { discord: delivery } })
+			)) as unknown as typeof fetch;
+		expect(await fetchChannelList(backend, 't', withDeliveries)).toEqual({
+			channels: ['discord'],
+			deliveries: { discord: delivery }
+		});
+		const odd = (async () =>
+			new Response(
+				JSON.stringify({ channels: ['discord'], deliveries: { discord: { ok: 'yes' } } })
+			)) as unknown as typeof fetch;
+		await expect(fetchChannelList(backend, 't', odd)).rejects.toThrow(/Unexpected/);
 		const old = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
 		expect(await fetchChannels(backend, 't', old)).toBeNull();
 		let url = '';

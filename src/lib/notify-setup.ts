@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { NotifyRoute, StackInfo } from './backend.ts';
+import type { ChannelDelivery, NotifyRoute, StackInfo } from './backend.ts';
+import { ago } from './hostupdates-cache.ts';
 
 /** Whether a stack runs the ntfy template (its template is source/name@version). */
 export function isNtfyStack(s: StackInfo): boolean {
@@ -96,4 +97,20 @@ export function applyPreset(
 			...(preset.route.minSeverity ? { minSeverity: preset.route.minSeverity } : {})
 		}
 	];
+}
+
+/**
+ * What a channel's last delivery says: "last delivered 5 min ago", or
+ * "last attempt failed 2 h ago: <reason>" (with when it last went out, if
+ * ever). Undefined: nothing sent yet, or the backend doesn't record it.
+ */
+export function deliveryText(
+	d: ChannelDelivery | undefined,
+	now = Date.now()
+): { ok: boolean; text: string } | undefined {
+	if (!d) return undefined;
+	if (d.ok) return { ok: true, text: `last delivered ${ago(d.at, now)}` };
+	const before = d.delivered ? ` (last delivered ${ago(d.delivered, now)})` : '';
+	const why = d.error ? `: ${d.error}` : '';
+	return { ok: false, text: `last attempt failed ${ago(d.at, now)}${before}${why}` };
 }
