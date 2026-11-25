@@ -1579,7 +1579,10 @@ export interface DoctorReport {
 		status: 'ok' | 'warn' | 'fail';
 		detail: string;
 		fix?: string;
-		/** A fix the app can start: dns-records is letCaddyKeepDNS. */
+		/**
+		 * A fix the app can start: dns-records is letCaddyKeepDNS, key-backup is
+		 * backupKey (the backend records the copy, so the warning clears).
+		 */
 		action?: string;
 	}[];
 	security: { check: string; level: string; message: string }[];

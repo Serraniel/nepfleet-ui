@@ -4,8 +4,9 @@
 	import { verifyIdentity } from '#lib/login.ts';
 	import Button from '#lib/ui/Button.svelte';
 
-	type Props = { backend: Backend; token: string };
-	let { backend, token }: Props = $props();
+	/** ondone: the file is saved, and the backend has recorded the copy. */
+	type Props = { backend: Backend; token: string; ondone?: () => void };
+	let { backend, token, ondone }: Props = $props();
 
 	let keys = $state('');
 	let busy = $state(false);
@@ -39,6 +40,7 @@
 			}
 			saveBlob('nepfleet-age-key.age', blob);
 			done = true;
+			ondone?.();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
