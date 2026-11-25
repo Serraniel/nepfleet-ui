@@ -7,6 +7,7 @@
 		fetchStackInputs,
 		setStackInputs
 	} from '#lib/backend.ts';
+	import { splitInputs } from '#lib/inputs.ts';
 	import { verifyIdentity } from '#lib/login.ts';
 	import Button from '#lib/ui/Button.svelte';
 
@@ -51,7 +52,13 @@
 	});
 
 	const missing = $derived((inputs ?? []).filter((i) => i.missing));
-	const others = $derived((inputs ?? []).filter((i) => !i.missing));
+	// The rest in the creation form's order: required ones first, then the
+	// others with inputs that share a prefix (OIDC_*) kept together.
+	const others = $derived.by(() => {
+		const { required, optional } = splitInputs((inputs ?? []).filter((i) => !i.missing));
+		return [...required.map((i) => ({ prefix: '', inputs: [i] })), ...optional];
+	});
+	const otherCount = $derived(others.reduce((n, g) => n + g.inputs.length, 0));
 
 	/** What changed: secrets typed in, other values that differ from the stored one. */
 	function changed(): Record<string, string> {
@@ -159,9 +166,18 @@
 			{#if others.length > 0}
 				<details open={missing.length === 0 ? undefined : false}>
 					<summary>
-						{missing.length > 0 ? 'Other settings' : 'Change settings'} ({others.length})
+						{missing.length > 0 ? 'Other settings' : 'Change settings'} ({otherCount})
 					</summary>
-					{#each others as i (i.name)}{@render field(i)}{/each}
+					{#each others as g (g.prefix || g.inputs.map((i) => i.name).join())}
+						{#if g.prefix}
+							<details class="group">
+								<summary>{g.prefix} ({g.inputs.length})</summary>
+								{#each g.inputs as i (i.name)}{@render field(i)}{/each}
+							</details>
+						{:else}
+							{#each g.inputs as i (i.name)}{@render field(i)}{/each}
+						{/if}
+					{/each}
 				</details>
 			{/if}
 			<Button
@@ -225,6 +241,10 @@
 	}
 	details .field {
 		margin: 0.6rem 0;
+	}
+	details.group {
+		border-left: 3px solid var(--border);
+		padding-left: 0.8rem;
 	}
 	.error {
 		color: var(--err);
