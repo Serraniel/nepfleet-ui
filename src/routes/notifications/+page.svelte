@@ -10,6 +10,7 @@
 	} from '#lib/notifications.ts';
 	import BackendEvents from '#lib/BackendEvents.svelte';
 	import ChannelTests from '#lib/ChannelTests.svelte';
+	import MailSettings from '#lib/MailSettings.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
@@ -107,6 +108,7 @@
 {/if}
 
 <ChannelTests />
+<MailSettings />
 
 <style>
 	header p,
