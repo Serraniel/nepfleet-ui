@@ -12,6 +12,7 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 	let seenId = 0;
 	const rollbacks: boolean[] = [];
 	const inputsSaved: Record<string, string>[] = [];
+	const sync: Record<string, unknown> = { enabled: false, remote: false };
 	await page.route(DAEMON + '/**', async (route: Route) => {
 		const req = route.request();
 		const cors = {
@@ -61,6 +62,7 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 			return json(200, [
 				{ name: 'photos', target: 'local', mode: 'compose', apply: 'auto', updates: 'patch' }
 			]);
+		if (path === '/v1/remotes/nas/api/v1/sync') return json(200, sync);
 		if (path === '/v1/events')
 			return json(200, {
 				events: events.filter((e) => e.id > Number(new URL(req.url()).searchParams.get('after'))),
@@ -132,7 +134,7 @@ async function mockDaemon(page: Page, events: { id: number; [k: string]: unknown
 		}
 		return json(404, { error: 'not here' });
 	});
-	return Object.assign(seen, { rollbacks, inputsSaved });
+	return Object.assign(seen, { rollbacks, inputsSaved, sync });
 }
 
 test('adds a machine, connects it, and its stacks show up', async ({ page }) => {
@@ -169,6 +171,36 @@ test('adds a machine, connects it, and its stacks show up', async ({ page }) => 
 	expect(seen).toContain(`GET /v1/remotes/nas/api/v1/stacks Bearer ${TOKEN}`);
 	// The token was never put where it outlives the tab.
 	expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('nfc_');
+});
+
+test('sync: says whether the fleet repository has a remote', async ({ page }) => {
+	const { sync } = await mockDaemon(page);
+	await page.goto('/fleets');
+	await page.getByLabel('Daemon address').fill(DAEMON);
+	await page.getByLabel('Token').fill(TOKEN);
+	await page.getByRole('button', { name: 'Connect' }).click();
+	await page.getByLabel('SSH address').fill('ssh://me@nas');
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
+	const card = page.getByRole('listitem').filter({ hasText: 'ssh://me@nas' });
+	await card.getByRole('button', { name: 'Connect' }).click();
+	await expect(card).toContainText('Connected');
+
+	// No remote: nothing to sync, and nothing missing.
+	await page.getByRole('link', { name: 'Sync', exact: true }).first().click();
+	await expect(page.getByText('The fleet repository lives on this server only.')).toBeVisible();
+	await expect(page.getByText('--sync 5m')).toHaveCount(0);
+
+	// A remote, but sync off: how to turn it on.
+	Object.assign(sync, { remote: true, remoteUrl: 'https://git.example.test/fleet.git' });
+	await page.getByRole('button', { name: 'Refresh' }).click();
+	await expect(page.getByText("but this server doesn't sync from it")).toBeVisible();
+	await expect(page.getByText('https://git.example.test/fleet.git')).toBeVisible();
+
+	// An older server doesn't say: the text from before.
+	delete sync.remote;
+	delete sync.remoteUrl;
+	await page.getByRole('button', { name: 'Refresh' }).click();
+	await expect(page.getByText("This server doesn't pull from a remote.")).toBeVisible();
 });
 
 test('in the desktop app it connects by itself', async ({ page }) => {

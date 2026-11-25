@@ -546,6 +546,16 @@ describe('Git sync', () => {
 		const odd = (async () =>
 			new Response(JSON.stringify({ enabled: 'yes' }))) as unknown as typeof fetch;
 		await expect(fetchSync(backend, 't', odd)).rejects.toThrow(/Unexpected/);
+		const remote = (async () =>
+			new Response(
+				JSON.stringify({ enabled: false, remote: true, remoteUrl: 'https://git.example.org/f.git' })
+			)) as unknown as typeof fetch;
+		const r = await fetchSync(backend, 't', remote);
+		expect(r.remote).toBe(true);
+		expect(r.remoteUrl).toBe('https://git.example.org/f.git');
+		const badRemote = (async () =>
+			new Response(JSON.stringify({ enabled: false, remote: 'yes' }))) as unknown as typeof fetch;
+		await expect(fetchSync(backend, 't', badRemote)).rejects.toThrow(/Unexpected/);
 	});
 	it('asks for a sync, and says when the server does not sync', async () => {
 		let method = '';
