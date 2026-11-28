@@ -161,7 +161,10 @@ test('Remove stack refuses what the plan refuses and needs Remove anyway for a n
 	await page.goto('/stacks/b1/app');
 	await page.getByRole('button', { name: 'Remove stack…' }).click();
 	let dialog = page.getByRole('dialog', { name: 'Remove app?' });
-	await expect(dialog.getByRole('alert')).toContainText('web takes UPSTREAM from it');
+	// The dialog's toaster is an alert region too.
+	await expect(dialog.getByRole('alert').filter({ hasText: "It can't be removed" })).toContainText(
+		'web takes UPSTREAM from it'
+	);
 	await expect(dialog.getByRole('button', { name: 'Remove', exact: true })).toBeDisabled();
 	await dialog.getByRole('button', { name: 'Cancel' }).click();
 
