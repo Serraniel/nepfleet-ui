@@ -18,6 +18,9 @@
 		retry?: (() => Promise<void>) | null;
 	} = $props();
 
+	// The layout and Fleets each have one: their forms must not share an id.
+	const uid = $props.id();
+	const formId = `unlock-${uid}`;
 	let passphrase = $state('');
 	let unlockError = $state('');
 	let unlocking = $state(false);
@@ -58,38 +61,34 @@
 </script>
 
 <Dialog bind:open title="Unlock your SSH key">
-	<form id="unlock-form" onsubmit={submit}>
-		<p>
-			<code>{keys[0]}</code> has a passphrase. NepFleet's SSH runs in the background, without a
-			terminal to ask on, so it keeps the key unlocked in an SSH agent for 8 hours.
-			{#if keys.length > 1}If the machine doesn't take this key, NepFleet asks for the next one ({keys
-					.slice(1)
-					.join(', ')}).{/if}
-		</p>
-		<label class="password">
-			Passphrase
-			<input
-				type="password"
-				autocomplete="off"
-				spellcheck="false"
-				bind:value={passphrase}
-				disabled={unlocking}
-			/>
-			<span class="muted">
-				Sent to the NepFleet daemon on this computer only, and kept nowhere.
-			</span>
-		</label>
-		{#if unlockError}<p class="error" role="alert">{unlockError}</p>{/if}
-	</form>
+	{#if open}
+		<form id={formId} onsubmit={submit}>
+			<p>
+				<code>{keys[0]}</code> has a passphrase. NepFleet's SSH runs in the background, without a
+				terminal to ask on, so it keeps the key unlocked in an SSH agent for 8 hours.
+				{#if keys.length > 1}If the machine doesn't take this key, NepFleet asks for the next one ({keys
+						.slice(1)
+						.join(', ')}).{/if}
+			</p>
+			<label class="password">
+				Passphrase
+				<input
+					type="password"
+					autocomplete="off"
+					spellcheck="false"
+					bind:value={passphrase}
+					disabled={unlocking}
+				/>
+				<span class="muted">
+					Sent to the NepFleet daemon on this computer only, and kept nowhere.
+				</span>
+			</label>
+			{#if unlockError}<p class="error" role="alert">{unlockError}</p>{/if}
+		</form>
+	{/if}
 	{#snippet actions()}
 		<Button variant="ghost" onclick={() => (open = false)}>Cancel</Button>
-		<Button
-			variant="primary"
-			type="submit"
-			form="unlock-form"
-			busy={unlocking}
-			disabled={!passphrase}
-		>
+		<Button variant="primary" type="submit" form={formId} busy={unlocking} disabled={!passphrase}>
 			{unlocking ? 'Unlocking…' : 'Unlock'}
 		</Button>
 	{/snippet}
