@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { type Pending, applicable, applyAll } from '#lib/apply-all.ts';
 	import { fetchJob, fetchPlan, startApply } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
@@ -26,7 +27,7 @@
 	let left = false;
 	onDestroy(() => (left = true));
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
 	const key = (p: { backend: string; stack: string }) => `${p.backend}/${p.stack}`;
 	const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 	const isDestructive = (p: Pending) => (p.plan.destructive?.length ?? 0) > 0;
@@ -50,25 +51,45 @@
 		}
 	}
 
-	async function check() {
-		checking = true;
+	// Each check is a round; picking another fleet ends it, and what it found
+	// is dropped, so Apply all only ever takes stacks of the fleet on show.
+	let round = 0;
+	function reset() {
+		round++;
+		checking = false;
+		checked = false;
+		confirmOpen = false;
 		pending = [];
 		other = [];
 		upToDate = 0;
 		typed = {};
+	}
+	$effect(() => {
+		void fleet.current;
+		untrack(() => {
+			if (!running) reset();
+		});
+	});
+
+	async function check() {
+		reset();
+		const mine = round;
+		checking = true;
 		await Promise.all(
 			connected.map(async (b) => {
 				const st = stacks.byBackend[b.id];
 				if (st?.state !== 'ok') return;
 				for (const s of st.stacks.filter((x) => x.apply === 'manual')) {
-					if (left) return;
+					if (left || mine !== round) return;
 					try {
 						const p = await plan(b.id, s.name);
+						if (mine !== round) return;
 						if (applicable(p))
 							pending.push({ backend: b.id, stack: s.name, plan: p, state: 'pending' });
 						else if (p.first) other.push({ backend: b.id, stack: s.name, why: 'not applied yet' });
 						else upToDate++;
 					} catch (e) {
+						if (mine !== round) return;
 						other.push({
 							backend: b.id,
 							stack: s.name,
@@ -78,6 +99,7 @@
 				}
 			})
 		);
+		if (mine !== round) return;
 		checking = false;
 		checked = true;
 	}

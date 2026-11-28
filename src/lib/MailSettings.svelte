@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import MailForm from '#lib/MailForm.svelte';
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
 </script>
 
 {#if connected.length}

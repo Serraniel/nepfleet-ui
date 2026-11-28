@@ -9,6 +9,7 @@
 		revokeToken
 	} from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { STACK_NAME } from '#lib/inputs.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { verifyIdentity } from '#lib/login.ts';
@@ -42,7 +43,14 @@
 	let created = $state<{ name: string; secret: string } | null>(null);
 	let copied = $state(false);
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	// Loaded for every backend, shown for the picked fleet: switching needs no wait.
+	const withToken = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
+	// A new token goes to a backend on show: the picked fleet's, when one is picked.
+	$effect(() => {
+		const first = connected[0];
+		if (first && !connected.some((b) => b.id === backendId)) backendId = first.id;
+	});
 	const stacks = $derived(
 		stackList
 			.split(',')
@@ -72,8 +80,7 @@
 
 	onMount(() => {
 		void local.refresh().then(() => {
-			if (!backendId && connected[0]) backendId = connected[0].id;
-			for (const b of connected) void load(b.id);
+			for (const b of withToken) void load(b.id);
 		});
 	});
 

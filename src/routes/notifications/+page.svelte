@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { fleet } from '#lib/fleet.svelte.ts';
+	import { eventInFleet } from '#lib/fleet.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import {
 		type MinSeverity,
@@ -17,7 +19,7 @@
 	let settings = $state(loadOsSettings());
 	let permissionError = $state('');
 
-	const newest = $derived([...local.events].reverse());
+	const newest = $derived(local.events.filter((e) => eventInFleet(e, fleet.current)).reverse());
 
 	onMount(() => {
 		void local.refresh();
@@ -77,9 +79,10 @@
 		<EmptyState title="Nothing yet">New events from connected fleets show up here.</EmptyState>
 	{:else}
 		<div class="row">
-			<p class="muted" role="status">{local.unread} unread</p>
+			<p class="muted" role="status">{fleet.unread} unread</p>
 			<Button onclick={() => local.markAllRead()} disabled={local.unread === 0}>
-				Mark all read
+				<!-- The daemon keeps one read mark for all its fleets. -->
+				{fleet.current ? 'Mark all fleets read' : 'Mark all read'}
 			</Button>
 		</div>
 		<ul class="events">
