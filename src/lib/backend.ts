@@ -871,6 +871,8 @@ export interface Job {
 	by: string;
 	/** The step a running job is in: step of steps, counted from the start. */
 	progress?: { step: number; steps: number; text: string };
+	/** What a finished job reports beyond its log (remove: a RemovalReport). */
+	result?: unknown;
 }
 
 export function isProgress(v: unknown): v is Job['progress'] {
@@ -2552,6 +2554,149 @@ export async function startRestore(
 		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
 		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
 		throw new ScopeError('Restoring needs a token with the edit scope, or signing in.');
+	}
+	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
+	if (res.status !== 202) throw await responseError(res);
+	const job: unknown = await res.json();
+	if (!isJob(job)) throw new Error('Unexpected response');
+	return job;
+}
+
+/** One of a stack's volumes, as a removal plan lists it. */
+export interface RemovalVolume {
+	name: string;
+	/** Its name in the compose file. */
+	key: string;
+	/** Kept in backups; a backup before removing is on when any volume is. */
+	backup: boolean;
+}
+
+/** What removing a stack does: GET /api/v1/stacks/{name}/removal. */
+export interface RemovalPlan {
+	id: string;
+	stack: string;
+	mode: string;
+	/** The stack's folder in the fleet repository, removed in one commit. */
+	directory: string;
+	containers: string[];
+	volumes: RemovalVolume[];
+	/** A backup is taken by default. */
+	backup: boolean;
+	/** Why no backup can be taken. */
+	backupUnavailable?: string;
+	backupFolder: string;
+	/** Names whose DNS records Caddy keeps; deleted where they point at this host alone. */
+	dns: string[];
+	dnsProvider?: string;
+	/** Names whose records NepFleet doesn't delete, with why. */
+	dnsManual: string[];
+	monitors: string[];
+	tokens: string[];
+	signOnClient?: string;
+	/** Other stacks need this system stack: force removes it anyway. */
+	blocked: string[];
+	/** Reasons nothing overrides. */
+	refused: string[];
+	steps: string[];
+}
+
+/** What a removal did: the result of its job. */
+export interface RemovalReport {
+	commit?: string;
+	/** The archive to restore from, after bringing the stack back. */
+	backup?: string;
+	removed: string[];
+	kept: string[];
+	warnings: string[];
+}
+
+export function isRemovalPlan(v: unknown): v is RemovalPlan {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return (
+		typeof o.id === 'string' &&
+		typeof o.stack === 'string' &&
+		typeof o.directory === 'string' &&
+		typeof o.backup === 'boolean' &&
+		Array.isArray(o.volumes) &&
+		o.volumes.every(
+			(x) =>
+				typeof x === 'object' &&
+				x !== null &&
+				typeof (x as Record<string, unknown>).name === 'string' &&
+				typeof (x as Record<string, unknown>).backup === 'boolean'
+		) &&
+		['containers', 'dns', 'dnsManual', 'monitors', 'tokens', 'blocked', 'refused', 'steps'].every(
+			(k) => strings(o[k])
+		)
+	);
+}
+
+export function isRemovalReport(v: unknown): v is RemovalReport {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return strings(o.removed) && strings(o.kept) && strings(o.warnings);
+}
+
+export function fetchRemovalPlan(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 130000
+): Promise<RemovalPlan> {
+	return apiGet(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/removal`,
+		isRemovalPlan,
+		fetcher,
+		timeoutMs
+	);
+}
+
+/** A removal request for a reviewed plan. */
+export interface RemoveRequest {
+	plan: string;
+	skipBackup?: boolean;
+	deleteData?: boolean;
+	/** The stack's name, to delete the data. */
+	confirm?: string;
+	force?: boolean;
+}
+
+/**
+ * Removes a stack as its reviewed plan says, as a job whose result is a
+ * RemovalReport. Throws VerifyFirstError when a person must confirm first,
+ * ConflictError with the backend's reason when it refuses.
+ */
+export async function startRemove(
+	backend: Backend,
+	token: string,
+	stack: string,
+	req: RemoveRequest,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 130000
+): Promise<Job> {
+	const res = await fetcher(`${backend.url}/api/v1/stacks/${encodeURIComponent(stack)}`, {
+		method: 'DELETE',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify(req)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Removing a stack needs a token with the edit scope, or signing in.');
 	}
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
