@@ -607,6 +607,19 @@ export async function fetchSetupJob(
 	return data;
 }
 
+/**
+ * When a check ran, for "failed at …": the time today, else the day too
+ * ("27 Nov, 14:05"). '' when unknown.
+ */
+export function checkedAt(checked: string | undefined, now = new Date()): string {
+	if (!checked) return '';
+	const at = new Date(checked);
+	if (Number.isNaN(at.getTime())) return '';
+	const time = at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+	if (at.toDateString() === now.toDateString()) return time;
+	return `${at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
 /** One plain sentence about a machine's Docker and NepFleet. */
 export function describe(r: RemoteReport): string {
 	const parts: string[] = [];
