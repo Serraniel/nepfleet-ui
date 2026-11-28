@@ -335,6 +335,8 @@ export interface NewStack {
 	port?: number;
 	/** The template's inputs; secret ones are stored encrypted on the backend. */
 	values?: Record<string, string>;
+	/** stack.yaml's spec.signOn; left out for the default. */
+	signOn?: { mode: SignOnMode; issuer?: string; clientID?: string; clientSecret?: string };
 }
 
 /**
@@ -788,6 +790,8 @@ export interface TemplateEntry {
 	supports: Record<string, boolean>;
 	inputs: import('./inputs.ts').TemplateInput[] | null;
 	generate: { name: string }[] | null;
+	/** The template can sign in through the fleet's identity provider. */
+	oidc?: { redirect: string; scopes?: string[]; logout?: string };
 }
 
 /** What GET /api/v1/templates returns per template source. */
@@ -1614,6 +1618,180 @@ export async function testMail(
 		throw new ScopeError('Sending a test needs an admin token, or signing in.');
 	if (res.status === 404) throw new NotFoundError('Save the mail settings first');
 	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+}
+
+export type SignOnMode = 'integrated' | 'custom' | 'none';
+
+/** The fleet's sign-on (GET /api/v1/signon). */
+export interface SignOnSettings {
+	/** The provider stack; '' without one. */
+	provider: string;
+	/** Templates the backend can register clients in (pocket-id). */
+	kinds: string[];
+	/** Stacks running one of kinds. */
+	candidates: string[];
+	/** Stacks whose template supports sign-on, or that set a mode. */
+	stacks: { name: string; mode: SignOnMode; explicit: boolean }[];
+}
+
+/** A stack's sign-on (GET /api/v1/stacks/{name}/signon). */
+export interface StackSignOn {
+	/** The template declares spec.oidc. */
+	supported: boolean;
+	/** The mode in effect; set is stack.yaml's own ('' for the default). */
+	mode: SignOnMode;
+	set: SignOnMode | '';
+	issuer?: string;
+	clientID?: string;
+	provider: string;
+	/** The custom client secret is stored; absent without the edit scope. */
+	secretSet?: boolean;
+}
+
+const strings = (v: unknown) => Array.isArray(v) && v.every((s) => typeof s === 'string');
+
+function isSignOnSettings(v: unknown): v is SignOnSettings {
+	const o = v as Partial<SignOnSettings> | null;
+	return (
+		typeof o?.provider === 'string' &&
+		strings(o.kinds) &&
+		strings(o.candidates) &&
+		Array.isArray(o.stacks) &&
+		o.stacks.every((s) => typeof s?.name === 'string' && typeof s.mode === 'string')
+	);
+}
+
+function isStackSignOn(v: unknown): v is StackSignOn {
+	const o = v as Partial<StackSignOn> | null;
+	return (
+		typeof o?.supported === 'boolean' &&
+		typeof o.mode === 'string' &&
+		typeof o.set === 'string' &&
+		typeof o.provider === 'string'
+	);
+}
+
+/** The fleet's sign-on; null on a backend too old to have it. */
+export async function fetchSignOn(
+	backend: Backend,
+	token: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<SignOnSettings | null> {
+	try {
+		return await apiGet(backend, token, '/api/v1/signon', isSignOnSettings, fetcher, timeoutMs);
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}
+
+/** A stack's sign-on; null on a backend too old to have it. */
+export async function fetchStackSignOn(
+	backend: Backend,
+	token: string,
+	stack: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<StackSignOn | null> {
+	try {
+		return await apiGet(
+			backend,
+			token,
+			`/api/v1/stacks/${encodeURIComponent(stack)}/signon`,
+			isStackSignOn,
+			fetcher,
+			timeoutMs
+		);
+	} catch (e) {
+		if (e instanceof NotFoundError) return null;
+		throw e;
+	}
+}
+
+/** A sign-on change: PUT or DELETE with a JSON body, answering the commit. */
+async function signOnChange(
+	backend: Backend,
+	token: string,
+	path: string,
+	method: 'PUT' | 'DELETE',
+	body: unknown,
+	scope: string,
+	fetcher: typeof fetch,
+	timeoutMs: number
+): Promise<string> {
+	const res = await fetcher(`${backend.url}${path}`, {
+		method,
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError(scope);
+	}
+	if (res.status === 404) throw new NotFoundError((await res.text()).trim() || 'Not found');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const o = (await res.json()) as { commit?: unknown };
+	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
+	return o.commit;
+}
+
+/**
+ * Names the fleet's sign-on provider (a stack), or with null removes it;
+ * committed on the backend, returns the commit (admin scope).
+ */
+export function saveSignOn(
+	backend: Backend,
+	token: string,
+	provider: string | null,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	return signOnChange(
+		backend,
+		token,
+		'/api/v1/signon',
+		provider === null ? 'DELETE' : 'PUT',
+		provider === null ? undefined : { provider },
+		'Changing the sign-on provider needs an admin token, or signing in.',
+		fetcher,
+		timeoutMs
+	);
+}
+
+/**
+ * Sets a stack's sign-on in stack.yaml; mode '' goes back to the default.
+ * The custom client secret goes with setSecret first.
+ */
+export function saveStackSignOn(
+	backend: Backend,
+	token: string,
+	stack: string,
+	update: { mode: SignOnMode | ''; issuer?: string; clientID?: string },
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	return signOnChange(
+		backend,
+		token,
+		`/api/v1/stacks/${encodeURIComponent(stack)}/signon`,
+		'PUT',
+		update,
+		'This token may not change the stack. That needs one with the edit scope.',
+		fetcher,
+		timeoutMs
+	);
 }
 
 /** A CycloneDX SBOM of a stack, or of the fleet's stacks the token sees (stack ''). */

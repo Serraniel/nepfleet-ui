@@ -23,8 +23,10 @@
 		stack: string;
 		/** After a save: the plan changed. */
 		onSaved?: () => void;
+		/** Inputs not to offer, such as the ones sign-on fills. */
+		hide?: (name: string) => boolean;
 	};
-	let { backend, token, stack, onSaved }: Props = $props();
+	let { backend, token, stack, onSaved, hide }: Props = $props();
 
 	let inputs = $state<StackInput[] | null>(null);
 	let loadError = $state('');
@@ -55,7 +57,9 @@
 	// The rest in the creation form's order: required ones first, then the
 	// others with inputs that share a prefix (OIDC_*) kept together.
 	const others = $derived.by(() => {
-		const { required, optional } = splitInputs((inputs ?? []).filter((i) => !i.missing));
+		const { required, optional } = splitInputs(
+			(inputs ?? []).filter((i) => !i.missing && !hide?.(i.name))
+		);
 		return [...required.map((i) => ({ prefix: '', inputs: [i] })), ...optional];
 	});
 	const otherCount = $derived(others.reduce((n, g) => n + g.inputs.length, 0));

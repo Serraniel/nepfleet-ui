@@ -35,6 +35,9 @@
 	import Restore from '#lib/Restore.svelte';
 	import SBOMButton from '#lib/SBOMButton.svelte';
 	import StackInputs from '#lib/StackInputs.svelte';
+	import StackSignOn from '#lib/StackSignOn.svelte';
+	import { hiddenBySignOn } from '#lib/signon.ts';
+	import type { SignOnMode } from '#lib/backend.ts';
 	import TemplateMatch from '#lib/TemplateMatch.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
@@ -53,6 +56,8 @@
 
 	let history = $state<Load<HistoryEntry[]>>({ state: 'loading' });
 	let plan = $state<Load<Plan>>({ state: 'loading' });
+	// The sign-on in effect: its inputs (OIDC_ISSUER, …) are NepFleet's then.
+	let signOnMode = $state<SignOnMode | undefined>(undefined);
 
 	function failed(e: unknown) {
 		return {
@@ -322,7 +327,16 @@
 	</a>
 	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
-{#if backend && token}<StackInputs {backend} {token} stack={name} onSaved={loadPlan} />{/if}
+{#if backend && token}
+	<StackSignOn {backend} {token} stack={name} bind:mode={signOnMode} onSaved={loadPlan} />
+	<StackInputs
+		{backend}
+		{token}
+		stack={name}
+		onSaved={loadPlan}
+		hide={(input) => hiddenBySignOn(input, signOnMode)}
+	/>
+{/if}
 {#if places.length}
 	<ul class="places" aria-label="Open elsewhere">
 		{#each places as place (place.url)}
