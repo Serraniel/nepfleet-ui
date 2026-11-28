@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { type ImageUpdate, fetchUpdates } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
 	import ApplyAll from '#lib/ApplyAll.svelte';
@@ -24,7 +25,9 @@
 		void local.refresh().then(() => stacks.loadAll());
 	});
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
+	// A check made before switching fleets keeps its results; only the picked show.
+	const shownRows = $derived(rows.filter((r) => connected.some((b) => b.id === r.backend)));
 	const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 	// One stack after another per backend: it renders each, one at a time, and
@@ -103,12 +106,12 @@
 	<ApplyAll {label} />
 	<h2>What's new</h2>
 	<Button onclick={checkAll} busy={checking}>
-		{checking ? 'Checking…' : rows.length ? 'Check again' : 'Check every stack'}
+		{checking ? 'Checking…' : shownRows.length ? 'Check again' : 'Check every stack'}
 	</Button>
 	<p class="muted">It asks each image's registry, stack by stack, so it takes a while.</p>
-	{#if rows.length}
+	{#if shownRows.length}
 		<ul class="rows">
-			{#each rows as r (r.backend + '/' + r.stack)}
+			{#each shownRows as r (r.backend + '/' + r.stack)}
 				<li>
 					<a href="/stacks/{encodeURIComponent(r.backend)}/{encodeURIComponent(r.stack)}">
 						<strong>{r.stack}</strong>

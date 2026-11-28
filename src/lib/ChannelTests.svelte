@@ -3,6 +3,7 @@
 	import { type ChannelList, fetchChannelList, setChannel, testChannel } from '#lib/backend.ts';
 	import { deliveryText } from '#lib/notify-setup.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import ChannelAdd from '#lib/ChannelAdd.svelte';
@@ -12,10 +13,10 @@
 	let result = $state<Record<string, { ok: boolean; text: string }>>({});
 	let sending = $state<Record<string, boolean>>({});
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
 
 	// Backends connect after the page opens (the control daemon's machines
-	// arrive later): load each once it's there.
+	// arrive later), or show when another fleet is picked: load each once it's there.
 	const asked = new Set<string>();
 	$effect(() => {
 		for (const b of connected) {

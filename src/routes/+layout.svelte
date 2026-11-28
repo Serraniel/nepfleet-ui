@@ -6,6 +6,9 @@
 	import { onMount } from 'svelte';
 	import { isDesktop, startDaemon } from '#lib/desktop.ts';
 	import { local } from '#lib/local.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
+	import { withFleet } from '#lib/fleet.ts';
+	import FleetPicker from '#lib/ui/FleetPicker.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
 
 	const labels: Record<Preference, string> = { system: 'System', light: 'Light', dark: 'Dark' };
@@ -25,7 +28,19 @@
 			.catch(() => {});
 	});
 
-	// Sections arrive with their milestones; listed so the shape of the app is visible.
+	// Links keep the picked fleet in the URL, so the address always says what's shown.
+	const sections = [
+		['/', 'Backends'],
+		['/fleets', 'Fleets'],
+		['/stacks', 'Stacks'],
+		['/templates', 'Templates'],
+		['/features', 'Features'],
+		['/updates', 'Updates'],
+		['/sync', 'Sync'],
+		['/maintenance', 'Maintenance'],
+		['/health', 'Health'],
+		['/access', 'Access']
+	] as const;
 </script>
 
 <div class="shell">
@@ -36,43 +51,23 @@
 			</svg>
 			NepFleet
 		</a>
+		<FleetPicker />
 		<nav aria-label="Main">
-			<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Backends</a>
-			<a href="/fleets" aria-current={page.url.pathname === '/fleets' ? 'page' : undefined}>
-				Fleets
-			</a>
-			<a href="/stacks" aria-current={page.url.pathname === '/stacks' ? 'page' : undefined}>
-				Stacks
-			</a>
-			<a href="/templates" aria-current={page.url.pathname === '/templates' ? 'page' : undefined}>
-				Templates
-			</a>
-			<a href="/features" aria-current={page.url.pathname === '/features' ? 'page' : undefined}>
-				Features
-			</a>
-			<a href="/updates" aria-current={page.url.pathname === '/updates' ? 'page' : undefined}>
-				Updates
-			</a>
-			<a href="/sync" aria-current={page.url.pathname === '/sync' ? 'page' : undefined}>Sync</a>
+			{#each sections as [path, name] (path)}
+				<a
+					href={withFleet(path, fleet.current)}
+					aria-current={page.url.pathname === path ? 'page' : undefined}
+				>
+					{name}
+				</a>
+			{/each}
 			<a
-				href="/maintenance"
-				aria-current={page.url.pathname === '/maintenance' ? 'page' : undefined}
-			>
-				Maintenance
-			</a>
-			<a href="/health" aria-current={page.url.pathname === '/health' ? 'page' : undefined}>
-				Health
-			</a>
-			<a href="/access" aria-current={page.url.pathname === '/access' ? 'page' : undefined}>
-				Access
-			</a>
-			<a
-				href="/notifications"
+				href={withFleet('/notifications', fleet.current)}
 				aria-current={page.url.pathname === '/notifications' ? 'page' : undefined}
-				aria-label={local.unread > 0 ? `Notifications, ${local.unread} unread` : 'Notifications'}
+				aria-label={fleet.unread > 0 ? `Notifications, ${fleet.unread} unread` : 'Notifications'}
 			>
 				Notifications
-				{#if local.unread > 0}<span class="count" aria-hidden="true">{local.unread}</span>{/if}
+				{#if fleet.unread > 0}<span class="count" aria-hidden="true">{fleet.unread}</span>{/if}
 			</a>
 		</nav>
 		<footer>

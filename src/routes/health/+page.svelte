@@ -4,6 +4,7 @@
 	import DNSRecordsFix from '#lib/DNSRecordsFix.svelte';
 	import KeyBackup from '#lib/KeyBackup.svelte';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Mirrors from '#lib/Mirrors.svelte';
@@ -46,7 +47,9 @@
 		void run(id);
 	}
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	// Checked for every backend, shown for the picked fleet: switching needs no wait.
+	const withToken = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
 
 	// quiet: keep showing the last report meanwhile, so the forms in it stay.
 	async function run(id: string, quiet = false) {
@@ -63,7 +66,7 @@
 
 	onMount(() => {
 		void local.refresh().then(() => {
-			for (const b of connected) void run(b.id);
+			for (const b of withToken) void run(b.id);
 		});
 	});
 
