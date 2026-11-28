@@ -119,6 +119,16 @@
 		unlockOpen = true;
 	}
 
+	// After a restart the new daemon's agent has no keys: ask for them, as on
+	// first use, instead of leaving the machine at "Connecting…".
+	$effect(() => {
+		const ask = local.askKeys;
+		if (!ask || unlockOpen) return;
+		local.askKeys = null;
+		const r = local.remotes.find((x) => x.name === ask.name);
+		askUnlock(ask.keys, r ? () => act(r, 'refresh') : null);
+	});
+
 	async function submitUnlock(event: SubmitEvent) {
 		event.preventDefault();
 		const key = unlockKeys[0];
@@ -506,7 +516,7 @@ nepfleet control token</code
 				variant="ghost"
 				busy={local.restartingDaemon}
 				onclick={() => local.restartDaemon()}
-				title="Stop the daemon and start the nepfleet installed now. Tunnels come back by themselves."
+				title="Stop the daemon and start the nepfleet installed now. Tunnels come back by themselves; keys you unlocked must be unlocked again."
 			>
 				{local.restartingDaemon ? 'Restarting…' : 'Restart the daemon'}
 			</Button>
@@ -518,7 +528,7 @@ nepfleet control token</code
 		<p class="notice" role="status">
 			NepFleet was updated to {local.installed.version}{#if local.installed.commit}
 				({local.installed.commit.slice(0, 7)}){/if}, but the daemon still runs the build it started
-			with. Restart it to use the new one.
+			with. Restart it to use the new one. Keys you unlocked must be unlocked again afterwards.
 			<Button variant="primary" busy={local.restartingDaemon} onclick={() => local.restartDaemon()}>
 				Restart the daemon
 			</Button>

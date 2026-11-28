@@ -32,6 +32,39 @@ export function unreachable(e: unknown): boolean {
 		(e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError'))
 	);
 }
+/**
+ * Runs fn again while the daemon doesn't answer yet: just started, its port
+ * may take a moment. Gives up after a few tries with words, not fetch's own
+ * ("Load failed", "Failed to fetch").
+ */
+export async function untilAnswers<T>(fn: () => Promise<T>, tries = 10, waitMs = 500): Promise<T> {
+	for (let i = 1; ; i++) {
+		try {
+			return await fn();
+		} catch (e) {
+			if (!unreachable(e)) throw e;
+			if (i >= tries) {
+				throw new Error(
+					'The control daemon does not answer yet; it may still be starting. Try again in a moment.'
+				);
+			}
+			await new Promise((resolve) => setTimeout(resolve, waitMs));
+		}
+	}
+}
+
+/** The first machine with locked keys not asked for yet, and those keys. */
+export function nextLocked(
+	remotes: Remote[],
+	asked: ReadonlySet<string>
+): { name: string; keys: string[] } | null {
+	for (const r of remotes) {
+		const keys = (r.lockedKeys ?? []).filter((k) => !asked.has(k));
+		if (keys.length) return { name: r.name, keys };
+	}
+	return null;
+}
+
 export const DEFAULT_DAEMON = 'http://127.0.0.1:7481';
 
 /**
@@ -51,6 +84,13 @@ class Local {
 	/** The daemon is being restarted on request; restartError says why it failed. */
 	restartingDaemon = $state(false);
 	restartError = $state('');
+	/**
+	 * Keys to ask for now: a new daemon has a new SSH agent, so keys unlocked
+	 * in the old one are locked again. Fleets opens the prompt and clears it.
+	 */
+	askKeys = $state<{ name: string; keys: string[] } | null>(null);
+	#askAfterStart = false;
+	#asked = new Set<string>();
 	#installedChecked = 0;
 	error = $state('');
 	events = $state<FleetEvent[]>([]);
@@ -93,12 +133,20 @@ class Local {
 			this.version = '';
 			this.commit = '';
 			this.#installedChecked = 0;
-			await this.connect(d.url, d.token, false);
+			this.#newDaemon();
+			await untilAnswers(() => this.connect(d.url, d.token, false));
 		} catch (e) {
 			this.restartError = e instanceof Error ? e.message : String(e);
 		} finally {
 			this.restartingDaemon = false;
 		}
+	}
+
+	/** A new daemon runs: ask for each locked key once more. */
+	#newDaemon() {
+		this.#askAfterStart = true;
+		this.#asked.clear();
+		this.askKeys = null;
 	}
 
 	private async checkInstalled() {
@@ -146,6 +194,13 @@ class Local {
 			this.remotes = await fetchRemotes(this.url, this.token);
 			this.error = '';
 			this.daemonDown = false;
+			if (this.#askAfterStart && !this.askKeys) {
+				const next = nextLocked(this.remotes, this.#asked);
+				if (next) {
+					for (const k of next.keys) this.#asked.add(k);
+					this.askKeys = next;
+				}
+			}
 			if (!this.version) {
 				const info = await fetchDaemonInfo(this.url, this.token).catch(() => null);
 				this.version = info?.version ?? '';
@@ -178,12 +233,15 @@ class Local {
 	}
 
 	private async restart() {
-		if (!isDesktop() || this.restarting) return;
+		// A restart on request starts the daemon itself: another start meanwhile
+		// would only race it.
+		if (!isDesktop() || this.restarting || this.restartingDaemon) return;
 		if (Date.now() - this.#lastRestart < RESTART_EVERY_MS) return;
 		this.#lastRestart = Date.now();
 		this.restarting = true;
 		try {
 			const d = await startDaemon();
+			this.#newDaemon();
 			await this.connect(d.url, d.token, false);
 		} catch {
 			// Still down: the banner says so, and the next refresh tries again.
