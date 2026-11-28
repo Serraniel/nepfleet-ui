@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { backends } from '#lib/backends.svelte.ts';
 	import { fleet } from '#lib/fleet.svelte.ts';
+	import { needsAttention, rowText, stackCount } from '#lib/problems.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
 	import { SESSION } from '#lib/backend.ts';
@@ -61,7 +62,8 @@
 				(!targetFilter || r.target === targetFilter) &&
 				(!stateFilter ||
 					(stateFilter === 'attention'
-						? ['unhealthy', 'partial', 'stopped'].includes(r.state ?? '')
+						? // Down, or something the backend can't plan or update by itself.
+							['unhealthy', 'partial', 'stopped'].includes(r.state ?? '') || needsAttention(r)
 						: (r.state ?? 'unknown') === stateFilter)) &&
 				(!query ||
 					`${r.name} ${r.template ?? ''} ${r.target}`.toLowerCase().includes(query.toLowerCase()))
@@ -144,7 +146,7 @@
 					<p class="error" role="alert">{st.error}</p>
 					<Button onclick={() => stacks.load(backend)}>Retry</Button>
 				{:else}
-					<p class="muted">{st.stacks.length} stacks</p>
+					<p class="muted">{stackCount(st.stacks)}</p>
 					{@const tok = tokens.byBackend[backend.id]}
 					{#if tok}<SBOMButton {backend} token={tok} stack="" />{/if}
 					{#if !backend.local && tokens.byBackend[backend.id] !== SESSION}
@@ -208,6 +210,12 @@
 							<a href="/stacks/{encodeURIComponent(s.backend)}/{encodeURIComponent(s.name)}">
 								<strong>{s.name}</strong>
 							</a>
+							{#if needsAttention(s)}
+								<span class="attention">
+									<span class="sr-only">Needs attention:</span>
+									{rowText(s)}
+								</span>
+							{/if}
 						</td>
 						<td>{backendName(s.backend)}</td>
 						<td>{s.target}</td>
@@ -265,6 +273,12 @@
 	td.state.partial,
 	td.state.stopped {
 		color: var(--err);
+	}
+	/* What the backend can't do by itself: the warning colour, under the name. */
+	.attention {
+		display: block;
+		font-size: 0.85em;
+		color: var(--warn);
 	}
 	.filters {
 		display: flex;

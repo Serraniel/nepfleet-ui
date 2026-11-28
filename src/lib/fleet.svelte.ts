@@ -2,6 +2,8 @@
 import { backends } from './backends.svelte.ts';
 import { KEY, backendsIn, effective, unreadIn } from './fleet.ts';
 import { local } from './local.svelte.ts';
+import { attentionCount } from './problems.ts';
+import { stacks } from './stacks.svelte.ts';
 
 function stored(): string {
 	try {
@@ -28,6 +30,16 @@ class Fleet {
 	/** Unread daemon events in this fleet: the Notifications badge. */
 	get unread() {
 		return this.current ? unreadIn(local.events, local.seen, this.current) : local.unread;
+	}
+
+	/** Stacks in this fleet with problems, of those loaded: the Stacks badge. */
+	get attention() {
+		let n = 0;
+		for (const b of this.visible) {
+			const st = stacks.byBackend[b.id];
+			if (st?.state === 'ok') n += attentionCount(st.stacks);
+		}
+		return n;
 	}
 
 	set(id: string) {

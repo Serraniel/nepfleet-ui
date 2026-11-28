@@ -13,6 +13,7 @@
 		NotFoundError,
 		type Plan,
 		type StackLink,
+		type StackProblem,
 		fetchHistory,
 		fetchJob,
 		fetchPlan,
@@ -39,6 +40,7 @@
 	import { hiddenBySignOn } from '#lib/signon.ts';
 	import type { SignOnMode } from '#lib/backend.ts';
 	import TemplateMatch from '#lib/TemplateMatch.svelte';
+	import { missingNames, problemFix, problemShort, problemsOf } from '#lib/problems.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -157,20 +159,37 @@
 
 	let places = $state<StackLink[]>([]);
 	let relations = $state<ReturnType<typeof stackRelations>>({ uses: [], usedBy: [] });
+	let problems = $state<StackProblem[]>([]);
 
 	/** A nicety: without them, the rest of the page works just the same. */
 	async function loadPlaces() {
 		places = [];
 		relations = { uses: [], usedBy: [] };
+		problems = [];
 		if (!backend || !token) return;
 		try {
 			const all = await fetchStacks(backend, token);
 			const info = all.find((s) => s.name === name);
 			places = info ? stackPlaces(info) : [];
 			relations = stackRelations(all, name);
+			problems = info ? problemsOf(info) : [];
 		} catch {
 			places = [];
 		}
+	}
+
+	/** Takes the person to the first missing setting, which the form marks required. */
+	function fillIn(p: StackProblem) {
+		const first = p.inputs?.[0];
+		const field = first && document.getElementById(`input-${name}-${first.name}`);
+		if (!field) return;
+		field.scrollIntoView({ block: 'center' });
+		field.focus();
+	}
+
+	function savedInputs() {
+		void loadPlan();
+		void loadPlaces();
 	}
 
 	// Opened directly: remotes through the control daemon aren't listed yet.
@@ -327,13 +346,34 @@
 	</a>
 	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
+{#if problems.length}
+	<section class="problems" aria-labelledby="problems-h">
+		<h2 id="problems-h">Needs attention</h2>
+		<ul>
+			{#each problems as p, i (i)}
+				<li>
+					<strong>{problemShort(p)}</strong>
+					{#if p.kind !== 'missing-input'}<span>{p.message}</span>{/if}
+					<span class="muted">{problemFix(p)}</span>
+					{#if p.kind === 'missing-input' && p.inputs?.length && backend && token}
+						<span>
+							<Button variant="primary" onclick={() => fillIn(p)}>
+								Fill in {missingNames(p).join(', ')}
+							</Button>
+						</span>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/if}
 {#if backend && token}
 	<StackSignOn {backend} {token} stack={name} bind:mode={signOnMode} onSaved={loadPlan} />
 	<StackInputs
 		{backend}
 		{token}
 		stack={name}
-		onSaved={loadPlan}
+		onSaved={savedInputs}
 		hide={(input) => hiddenBySignOn(input, signOnMode)}
 	/>
 {/if}
@@ -683,6 +723,31 @@
 </Dialog>
 
 <style>
+	/* What the backend can't do by itself, before anything else on the page. */
+	.problems {
+		margin: 1rem 0;
+		padding: 0.75rem 1rem;
+		border: 1px solid var(--warn);
+		border-radius: calc(var(--radius) + 4px);
+	}
+	.problems h2 {
+		margin: 0 0 0.5rem;
+		font-size: 1.05rem;
+		color: var(--warn);
+	}
+	.problems ul {
+		display: grid;
+		gap: 0.75rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.problems li {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.25rem;
+	}
 	.places {
 		display: flex;
 		flex-wrap: wrap;

@@ -108,6 +108,17 @@ export interface StackInfo {
 	uses?: StackRef[];
 	/** running, unhealthy, partial or stopped; absent for other hosts, swarm, or not applied. */
 	state?: string;
+	/** What keeps it from being planned or updated; absent on servers before this. */
+	problems?: StackProblem[];
+}
+
+/** Something a person has to fix for a stack, as the backend found it. */
+export interface StackProblem {
+	/** missing-input, template, plan or update-blocked; others may come. */
+	kind: string;
+	message: string;
+	/** For missing-input: the required inputs without a value. */
+	inputs?: { name: string; title?: string }[];
 }
 
 export interface StackLink {

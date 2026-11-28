@@ -8,6 +8,7 @@
 	import { local } from '#lib/local.svelte.ts';
 	import { fleet } from '#lib/fleet.svelte.ts';
 	import { withFleet } from '#lib/fleet.ts';
+	import { stacks } from '#lib/stacks.svelte.ts';
 	import FleetPicker from '#lib/ui/FleetPicker.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
 	import UnlockKeyDialog from '#lib/UnlockKeyDialog.svelte';
@@ -32,6 +33,9 @@
 
 	// The desktop app connects by itself. If it can't, the Fleets page says why.
 	onMount(() => {
+		// The stacks of backends with a token kept for this tab, for the Stacks
+		// badge on any page. The daemon's machines load theirs as they connect.
+		void stacks.loadAll();
 		// A token kept for this tab: follow it from any page, for the unread count.
 		if (local.connected) {
 			void local.refresh();
@@ -69,11 +73,16 @@
 		<FleetPicker />
 		<nav aria-label="Main">
 			{#each sections as [path, name] (path)}
+				{@const attention = path === '/stacks' ? fleet.attention : 0}
 				<a
 					href={withFleet(path, fleet.current)}
 					aria-current={page.url.pathname === path ? 'page' : undefined}
+					aria-label={attention > 0
+						? `${name}, ${attention} ${attention === 1 ? 'needs' : 'need'} attention`
+						: undefined}
 				>
 					{name}
+					{#if attention > 0}<span class="count warn" aria-hidden="true">{attention}</span>{/if}
 				</a>
 			{/each}
 			<a
@@ -208,6 +217,9 @@
 		text-align: center;
 		color: var(--surface);
 		background: var(--text);
+	}
+	.count.warn {
+		background: var(--warn);
 	}
 	footer {
 		margin-top: auto;
