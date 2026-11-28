@@ -2582,6 +2582,10 @@ export interface RemovalPlan {
 	directory: string;
 	containers: string[];
 	volumes: RemovalVolume[];
+	/** The working directory on the backend's host: its rendered files go. */
+	workDir: string;
+	/** What else it holds (bind mounts' data, by top-level entry): kept, not in the backup. */
+	workData: string[];
 	/** A backup is taken by default. */
 	backup: boolean;
 	/** Why no backup can be taken. */
@@ -2599,6 +2603,8 @@ export interface RemovalPlan {
 	blocked: string[];
 	/** Reasons nothing overrides. */
 	refused: string[];
+	/** Worth reading first: an upstream to push to, files git ignores. */
+	warnings: string[];
 	steps: string[];
 }
 
@@ -2628,6 +2634,8 @@ export function isRemovalPlan(v: unknown): v is RemovalPlan {
 				typeof (x as Record<string, unknown>).name === 'string' &&
 				typeof (x as Record<string, unknown>).backup === 'boolean'
 		) &&
+		// Lists a backend may leave out are empty.
+		['workData', 'warnings'].every((k) => (o[k] ??= []) && strings(o[k])) &&
 		['containers', 'dns', 'dnsManual', 'monitors', 'tokens', 'blocked', 'refused', 'steps'].every(
 			(k) => strings(o[k])
 		)
@@ -2694,9 +2702,19 @@ export async function startRemove(
 	if (res.status === 401) throw new AuthError('The backend refused the token');
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
 	if (res.status === 403) {
-		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		const text = await res.text();
+		let o: { verify?: unknown } | null = null;
+		try {
+			o = JSON.parse(text) as { verify?: unknown };
+		} catch {
+			// plain text: the scope it lacks
+		}
 		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
-		throw new ScopeError('Removing a stack needs a token with the edit scope, or signing in.');
+		throw new ScopeError(
+			req.deleteData
+				? 'Deleting a stack’s data needs an admin token, or signing in.'
+				: 'Removing a stack needs a token with the edit scope, or signing in.'
+		);
 	}
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());

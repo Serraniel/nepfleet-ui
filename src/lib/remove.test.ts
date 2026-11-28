@@ -19,6 +19,9 @@ const plan = (over: Partial<RemovalPlan> = {}): RemovalPlan => ({
 	directory: 'stacks/wiki',
 	containers: ['wiki-web-1'],
 	volumes: [{ name: 'wiki_data', key: 'data', backup: true }],
+	workDir: '/var/lib/nepfleet/stacks/wiki',
+	workData: [],
+	warnings: [],
 	backup: true,
 	backupFolder: '/var/lib/nepfleet/removed',
 	dns: ['wiki.example.test'],
@@ -51,8 +54,14 @@ describe('remove stack choices', () => {
 		c.typed = 'wiki';
 		expect(whyNot(plan(), c)).toBe('');
 		expect(removeRequest(plan(), c)).toEqual({ plan: 'p1', deleteData: true, confirm: 'wiki' });
-		// No volumes: nothing to delete, nothing sent.
+		// No volumes and no files: nothing to delete, nothing sent.
 		expect(removeRequest(plan({ volumes: [] }), c)).toEqual({ plan: 'p1' });
+		// A bind mount's files in the working directory are data too.
+		expect(removeRequest(plan({ volumes: [], workData: ['config/'] }), c)).toEqual({
+			plan: 'p1',
+			deleteData: true,
+			confirm: 'wiki'
+		});
 	});
 
 	it('skips the backup only when asked', () => {
@@ -111,6 +120,12 @@ describe('removal API', () => {
 		expect((await fetchRemovalPlan(backend, 't', 'wiki', ok)).id).toBe('p1');
 		expect(url).toBe('https://fleet.example.test/api/v1/stacks/wiki/removal');
 		expect(isRemovalPlan({ ...plan(), steps: undefined })).toBe(false);
+		const older: Record<string, unknown> = { ...plan() };
+		delete older.workData;
+		delete older.warnings;
+		expect(isRemovalPlan(older)).toBe(true);
+		expect(older.workData).toEqual([]);
+		expect(isRemovalPlan({ ...plan(), workData: [1] })).toBe(false);
 		expect(isRemovalPlan({ ...plan(), volumes: [{ name: 1 }] })).toBe(false);
 	});
 

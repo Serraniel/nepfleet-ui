@@ -13,6 +13,7 @@
 	import {
 		type RemoveChoices,
 		defaultChoices,
+		hasData,
 		removeRequest,
 		reportOf,
 		whyNot
@@ -159,6 +160,13 @@
 				{#each plan.dnsManual as d (d)}<li>{d}</li>{/each}
 			</ul>
 		{/if}
+		{#if plan.warnings.length}
+			<div class="warn">
+				<ul aria-label="Warnings">
+					{#each plan.warnings as w (w)}<li>{w}</li>{/each}
+				</ul>
+			</div>
+		{/if}
 		{#if plan.refused.length}
 			<div class="warn" role="alert">
 				<strong>It can't be removed:</strong>
@@ -191,19 +199,33 @@
 						The volumes go into one encrypted archive in <code>{plan.backupFolder}</code>.
 					{/if}
 				</p>
-				{#if plan.volumes.length}
+				{#if hasData(plan)}
 					<label>
 						<input type="checkbox" bind:checked={choices.deleteData} />
 						Delete the data too
 					</label>
-					<p class="muted">
-						Without it the volumes stay: {plan.volumes.map((v) => v.name).join(', ')}.
-					</p>
+					<div class="muted indent">
+						Without it, the data stays:
+						<ul aria-label="Data">
+							{#each plan.volumes as v (v.name)}
+								<li>
+									volume <code>{v.name}</code>{#if plan.backup && !v.backup}
+										(not in the backup){/if}
+								</li>
+							{/each}
+							{#each plan.workData as d (d)}
+								<li><code>{d}</code> in <code>{plan.workDir}</code> (not in the backup)</li>
+							{/each}
+						</ul>
+					</div>
 					{#if choices.deleteData}
 						<div class="warn">
 							<strong>The data is deleted:</strong>
-							{plan.volumes.length} volume(s). {choices.backup && plan.backup
-								? 'Only the backup keeps it.'
+							{plan.volumes.length} volume(s){plan.workData.length
+								? `, and ${plan.workData.join(', ')} in ${plan.workDir}`
+								: ''}.
+							{choices.backup && plan.backup
+								? 'Only the backup keeps the volumes; the files go for good.'
 								: 'Nothing keeps it.'}
 						</div>
 						<TextField
@@ -254,8 +276,13 @@
 		border-radius: var(--radius);
 		margin: 0.75rem 0;
 	}
-	fieldset p {
+	fieldset p,
+	.indent {
 		margin: 0 0 0.5rem 1.6rem;
+	}
+	.indent ul {
+		margin: 0.25rem 0 0;
+		padding-left: 1.25rem;
 	}
 	.warn {
 		border: 1px solid var(--err);

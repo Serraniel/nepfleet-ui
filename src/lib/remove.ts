@@ -33,11 +33,16 @@ export function whyNot(plan: RemovalPlan, c: RemoveChoices): string {
 	return '';
 }
 
+/** The stack has data to delete: volumes, or files in its working directory. */
+export function hasData(plan: RemovalPlan): boolean {
+	return plan.volumes.length > 0 || plan.workData.length > 0;
+}
+
 /** The request for a reviewed plan and the dialog's choices. */
 export function removeRequest(plan: RemovalPlan, c: RemoveChoices): RemoveRequest {
 	const req: RemoveRequest = { plan: plan.id };
 	if (plan.backup && !c.backup) req.skipBackup = true;
-	if (c.deleteData && plan.volumes.length) {
+	if (c.deleteData && hasData(plan)) {
 		req.deleteData = true;
 		req.confirm = c.typed;
 	}

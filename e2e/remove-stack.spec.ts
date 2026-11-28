@@ -10,7 +10,13 @@ const removal = (stack: string, over: Record<string, unknown> = {}) => ({
 	mode: 'compose',
 	directory: 'stacks/' + stack,
 	containers: [stack + '-web-1'],
-	volumes: [{ name: stack + '_data', key: 'data', backup: true }],
+	volumes: [
+		{ name: stack + '_data', key: 'data', backup: true },
+		{ name: stack + '_cache', key: 'cache', backup: false }
+	],
+	workDir: '/var/lib/nepfleet/stacks/' + stack,
+	workData: ['config/'],
+	warnings: ['the fleet repository tracks origin/main: push the removal commit there (git push)'],
 	backup: true,
 	backupFolder: '/var/lib/nepfleet/removed',
 	dns: [stack + '.example.test'],
@@ -120,6 +126,12 @@ test('Remove stack shows the plan, deletes the data only when typed, and reports
 	const dialog = page.getByRole('dialog', { name: 'Remove wiki?' });
 	await expect(dialog).toContainText('remove stacks/wiki in one commit');
 	await expect(dialog).toContainText('old.example.test');
+	await expect(dialog.getByRole('list', { name: 'Warnings' })).toContainText(
+		'push the removal commit'
+	);
+	const data = dialog.getByRole('list', { name: 'Data' });
+	await expect(data).toContainText('config/ in /var/lib/nepfleet/stacks/wiki (not in the backup)');
+	await expect(data).toContainText('wiki_cache (not in the backup)');
 	await expect(dialog.getByLabel('Back up first')).toBeChecked();
 	await expect(dialog.getByLabel('Delete the data too')).not.toBeChecked();
 
@@ -127,7 +139,7 @@ test('Remove stack shows the plan, deletes the data only when typed, and reports
 	await expect(remove).toBeEnabled();
 	await dialog.getByLabel('Delete the data too').check();
 	await expect(remove).toBeDisabled();
-	await expect(dialog).toContainText('Only the backup keeps it.');
+	await expect(dialog).toContainText('Only the backup keeps the volumes; the files go for good.');
 	await dialog.getByLabel('Type wiki to delete its data').fill('wiki');
 	await expect(remove).toBeEnabled();
 	await remove.click();
