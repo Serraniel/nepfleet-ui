@@ -1,5 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import adapter from '@sveltejs/adapter-static';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 
@@ -10,6 +11,17 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 };
 const version = (process.env.APP_VERSION || pkg.version || 'dev').replace(/^v/, '');
 
+// The commit: APP_COMMIT when set, else the checkout's (packages build from
+// one), '' outside git. Shown next to the daemon's, which says its own.
+function gitCommit(): string {
+	try {
+		return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+	} catch {
+		return '';
+	}
+}
+const commit = process.env.APP_COMMIT || gitCommit();
+
 export default defineConfig({
 	plugins: [
 		sveltekit({
@@ -18,7 +30,8 @@ export default defineConfig({
 		})
 	],
 	define: {
-		__APP_VERSION__: JSON.stringify(version)
+		__APP_VERSION__: JSON.stringify(version),
+		__APP_COMMIT__: JSON.stringify(commit)
 	},
 	test: {
 		include: ['src/**/*.test.ts'],

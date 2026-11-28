@@ -14,8 +14,6 @@
 		removeRemote,
 		setupKind,
 		LockedKeyError,
-		WrongPassphraseError,
-		unlockKey,
 		canConnect,
 		startSetup,
 		type SetupKind,
@@ -35,6 +33,7 @@
 	import { backends } from '#lib/backends.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import DNSRecordsFix from '#lib/DNSRecordsFix.svelte';
+	import UnlockKeyDialog from '#lib/UnlockKeyDialog.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import ProgressBar from '#lib/ui/ProgressBar.svelte';
@@ -103,51 +102,12 @@
 	// terminal, so it asks here, then runs what needed the key again.
 	let unlockOpen = $state(false);
 	let unlockKeys = $state<string[]>([]);
-	let passphrase = $state('');
-	let unlockError = $state('');
-	let unlocking = $state(false);
-	let afterUnlock: (() => Promise<void>) | null = null;
-	$effect(() => {
-		if (!unlockOpen) passphrase = '';
-	});
+	let afterUnlock = $state<(() => Promise<void>) | null>(null);
 
 	function askUnlock(keys: string[], retry: (() => Promise<void>) | null) {
 		unlockKeys = keys;
-		unlockError = '';
-		passphrase = '';
 		afterUnlock = retry;
 		unlockOpen = true;
-	}
-
-	async function submitUnlock(event: SubmitEvent) {
-		event.preventDefault();
-		const key = unlockKeys[0];
-		if (!key || !passphrase) return;
-		const given = passphrase;
-		passphrase = '';
-		unlocking = true;
-		unlockError = '';
-		try {
-			await unlockKey(local.url, local.token, key, given);
-			// One key is usually enough: try again with it. Only if the machine
-			// still refuses does the next refusal name the remaining keys (those
-			// already unlocked aren't listed again), and this asks for them.
-			unlockKeys = [];
-			unlockOpen = false;
-			const retry = afterUnlock;
-			afterUnlock = null;
-			if (retry) await retry();
-			else await local.refresh();
-		} catch (e) {
-			unlockError =
-				e instanceof WrongPassphraseError
-					? "That passphrase doesn't unlock the key; try again."
-					: e instanceof Error
-						? e.message
-						: String(e);
-		} finally {
-			unlocking = false;
-		}
 	}
 
 	async function add(event: SubmitEvent) {
@@ -506,7 +466,9 @@ nepfleet control token</code
 				variant="ghost"
 				busy={local.restartingDaemon}
 				onclick={() => local.restartDaemon()}
-				title="Stop the daemon and start the nepfleet installed now. Tunnels come back by themselves."
+				title={local.followsUpdates
+					? 'Restart the daemon in place with the nepfleet installed now. Unlocked keys stay unlocked; tunnels reconnect.'
+					: 'Stop the daemon and start the nepfleet installed now. Tunnels come back by themselves; keys you unlocked must be unlocked again.'}
 			>
 				{local.restartingDaemon ? 'Restarting…' : 'Restart the daemon'}
 			</Button>
@@ -517,11 +479,21 @@ nepfleet control token</code
 	{#if desktop && local.outdated && local.installed}
 		<p class="notice" role="status">
 			NepFleet was updated to {local.installed.version}{#if local.installed.commit}
-				({local.installed.commit.slice(0, 7)}){/if}, but the daemon still runs the build it started
-			with. Restart it to use the new one.
-			<Button variant="primary" busy={local.restartingDaemon} onclick={() => local.restartDaemon()}>
-				Restart the daemon
-			</Button>
+				({local.installed.commit.slice(0, 7)}){/if}.
+			{#if local.followsUpdates}
+				The daemon switches to it by itself as soon as no setup runs, and unlocked keys stay
+				unlocked.
+			{:else}
+				The daemon still runs the build it started with. Restart it to use the new one. Keys you
+				unlocked must be unlocked again afterwards.
+				<Button
+					variant="primary"
+					busy={local.restartingDaemon}
+					onclick={() => local.restartDaemon()}
+				>
+					Restart the daemon
+				</Button>
+			{/if}
 		</p>
 	{/if}
 	{#if local.restartError}<p class="error" role="alert">{local.restartError}</p>{/if}
@@ -804,42 +776,7 @@ nepfleet control token</code
 	{/if}
 {/if}
 
-<Dialog bind:open={unlockOpen} title="Unlock your SSH key">
-	<form id="unlock-form" onsubmit={submitUnlock}>
-		<p>
-			<code>{unlockKeys[0]}</code> has a passphrase. NepFleet's SSH runs in the background, without
-			a terminal to ask on, so it keeps the key unlocked in an SSH agent for 8 hours.
-			{#if unlockKeys.length > 1}If the machine doesn't take this key, NepFleet asks for the next
-				one ({unlockKeys.slice(1).join(', ')}).{/if}
-		</p>
-		<label class="password">
-			Passphrase
-			<input
-				type="password"
-				autocomplete="off"
-				spellcheck="false"
-				bind:value={passphrase}
-				disabled={unlocking}
-			/>
-			<span class="muted">
-				Sent to the NepFleet daemon on this computer only, and kept nowhere.
-			</span>
-		</label>
-		{#if unlockError}<p class="error" role="alert">{unlockError}</p>{/if}
-	</form>
-	{#snippet actions()}
-		<Button variant="ghost" onclick={() => (unlockOpen = false)}>Cancel</Button>
-		<Button
-			variant="primary"
-			type="submit"
-			form="unlock-form"
-			busy={unlocking}
-			disabled={!passphrase}
-		>
-			{unlocking ? 'Unlocking…' : 'Unlock'}
-		</Button>
-	{/snippet}
-</Dialog>
+<UnlockKeyDialog bind:open={unlockOpen} keys={unlockKeys} retry={afterUnlock} />
 
 <Dialog bind:open={setupOpen} title="{setupTitle(setupPlan)} on {setupFor?.name}">
 	{#if planning}

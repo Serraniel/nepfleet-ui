@@ -381,7 +381,7 @@ test('a setup that needed a key unlocked plans the same kind again', async ({ pa
 				body: JSON.stringify(body)
 			});
 		if (url.pathname === '/v1/info')
-			return json(200, { version: 'edge', commit: 'abc1234', pid: 1 });
+			return json(200, { version: 'edge', commit: 'abc1234', pid: 1, api: 2 });
 		if (url.pathname === '/v1/events') return json(200, { events: [], unread: 0, seen: 0 });
 		if (url.pathname === '/v1/remotes')
 			return json(200, [

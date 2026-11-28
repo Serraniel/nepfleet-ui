@@ -27,7 +27,8 @@ import {
 	updateOffer,
 	daemonOutdated,
 	fetchDaemonInfo,
-	parseVersionOutput
+	parseVersionOutput,
+	versionSkew
 } from './local.ts';
 
 const daemon = 'http://127.0.0.1:7481';
@@ -443,16 +444,47 @@ group('updateOffer', () => {
 
 group('daemon restart after an update', () => {
 	it('reads the daemon build', async () => {
-		const f = fake(200, { version: 'edge', commit: 'abc1234', pid: 1 });
+		const started = '2026-11-28T10:00:00Z';
+		const f = fake(200, { version: 'edge', commit: 'abc1234', pid: 1, api: 2, started });
 		expect(await fetchDaemonInfo(daemon, 'nfc_x', f.fetcher)).toEqual({
 			version: 'edge',
-			commit: 'abc1234'
+			commit: 'abc1234',
+			api: 2,
+			started
 		});
 		const old = fake(200, { version: '0.3.4', pid: 1 });
 		expect(await fetchDaemonInfo(daemon, 'nfc_x', old.fetcher)).toEqual({
 			version: '0.3.4',
-			commit: ''
+			commit: '',
+			api: 0,
+			started: ''
 		});
+	});
+
+	it('says which package to update when app and nepfleet differ', () => {
+		const d = (version: string, api = 2) => ({ version, commit: '', api });
+		// Releases go in step: another major or minor tells which is behind.
+		expect(versionSkew('0.5.0', d('0.4.2'), null)).toEqual({
+			update: 'nepfleet',
+			app: '0.5.0',
+			daemon: '0.4.2'
+		});
+		expect(versionSkew('0.4.0', d('0.5.1'), null)?.update).toBe('app');
+		// A patch release on one side alone fits.
+		expect(versionSkew('0.5.1', d('0.5.0'), null)).toBeNull();
+		// Edge builds: the daemon's API level tells.
+		expect(versionSkew('edge', d('edge', 0), null)?.update).toBe('nepfleet');
+		expect(versionSkew('edge', d('edge', 2), null)).toBeNull();
+		// Not while the daemon is about to switch to the nepfleet installed now.
+		expect(
+			versionSkew(
+				'edge',
+				{ version: 'edge', commit: 'a', api: 0 },
+				{ version: 'edge', commit: 'b' }
+			)
+		).toBeNull();
+		// Nothing known about the daemon yet.
+		expect(versionSkew('0.5.0', d(''), null)).toBeNull();
 	});
 
 	it('reads nepfleet version', () => {

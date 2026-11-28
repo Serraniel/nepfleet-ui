@@ -5,6 +5,8 @@ import { installedVersion, isDesktop, restartDaemon, startDaemon } from './deskt
 import {
 	type Build,
 	type Remote,
+	DAEMON_API_FOLLOWS_UPDATES,
+	versionSkew,
 	daemonOutdated,
 	fetchDaemonInfo,
 	parseVersionOutput,
@@ -32,6 +34,43 @@ export function unreachable(e: unknown): boolean {
 		(e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError'))
 	);
 }
+/**
+ * Runs fn again while the daemon doesn't answer yet: just started, its port
+ * may take a moment. Gives up after a few tries with words, not fetch's own
+ * ("Load failed", "Failed to fetch").
+ */
+export async function untilAnswers<T>(fn: () => Promise<T>, tries = 10, waitMs = 500): Promise<T> {
+	for (let i = 1; ; i++) {
+		try {
+			return await fn();
+		} catch (e) {
+			if (!unreachable(e)) throw e;
+			if (i >= tries) {
+				throw new Error(
+					'The control daemon does not answer yet; it may still be starting. Try again in a moment.'
+				);
+			}
+			await new Promise((resolve) => setTimeout(resolve, waitMs));
+		}
+	}
+}
+
+/**
+ * The first connected machine with locked keys not asked for yet, and those
+ * keys: its tunnel waits for them. (A check alone shows a button on Fleets.)
+ */
+export function nextLocked(
+	remotes: Remote[],
+	asked: ReadonlySet<string>
+): { name: string; keys: string[] } | null {
+	for (const r of remotes) {
+		if (!r.connect) continue;
+		const keys = (r.lockedKeys ?? []).filter((k) => !asked.has(k));
+		if (keys.length) return { name: r.name, keys };
+	}
+	return null;
+}
+
 export const DEFAULT_DAEMON = 'http://127.0.0.1:7481';
 
 /**
@@ -46,11 +85,22 @@ class Local {
 	version = $state('');
 	/** The commit the daemon was built from, '' when it doesn't say. */
 	commit = $state('');
+	/** The daemon's API level, 0 before it said one. */
+	api = $state(0);
+	#started = '';
 	/** The nepfleet installed now (desktop app only): another build after an update. */
 	installed = $state<Build | null>(null);
 	/** The daemon is being restarted on request; restartError says why it failed. */
 	restartingDaemon = $state(false);
 	restartError = $state('');
+	/**
+	 * Keys to ask for now, on any page: a connected machine's tunnel waits for
+	 * them (they expired, or a daemon restarted with a new SSH agent). The
+	 * prompt in the layout opens and clears it; each key is asked for once per
+	 * daemon, and Fleets keeps a button for later.
+	 */
+	askKeys = $state<{ name: string; keys: string[] } | null>(null);
+	#asked = new Set<string>();
 	#installedChecked = 0;
 	error = $state('');
 	events = $state<FleetEvent[]>([]);
@@ -80,6 +130,20 @@ class Local {
 		return daemonOutdated({ version: this.version, commit: this.commit }, this.installed);
 	}
 
+	/** The daemon switches to an updated nepfleet by itself. */
+	get followsUpdates() {
+		return this.api >= DAEMON_API_FOLLOWS_UPDATES;
+	}
+
+	/** This app and the running nepfleet don't fit together: which to update. */
+	get skew() {
+		return versionSkew(
+			__APP_VERSION__,
+			{ version: this.version, commit: this.commit, api: this.api },
+			this.installed
+		);
+	}
+
 	/**
 	 * Restarts the daemon with the nepfleet installed now, through the desktop
 	 * app. Tunnels come back by themselves; a running setup makes it refuse.
@@ -93,12 +157,19 @@ class Local {
 			this.version = '';
 			this.commit = '';
 			this.#installedChecked = 0;
-			await this.connect(d.url, d.token, false);
+			this.#newDaemon();
+			await untilAnswers(() => this.connect(d.url, d.token, false));
 		} catch (e) {
 			this.restartError = e instanceof Error ? e.message : String(e);
 		} finally {
 			this.restartingDaemon = false;
 		}
+	}
+
+	/** A new daemon runs: ask for each locked key once more. */
+	#newDaemon() {
+		this.#asked.clear();
+		this.askKeys = null;
 	}
 
 	private async checkInstalled() {
@@ -146,10 +217,25 @@ class Local {
 			this.remotes = await fetchRemotes(this.url, this.token);
 			this.error = '';
 			this.daemonDown = false;
-			if (!this.version) {
-				const info = await fetchDaemonInfo(this.url, this.token).catch(() => null);
-				this.version = info?.version ?? '';
-				this.commit = info?.commit ?? '';
+			// Every time: the daemon may have switched to an updated nepfleet in
+			// place, without ever being unreachable.
+			const info = await fetchDaemonInfo(this.url, this.token).catch(() => null);
+			if (info) {
+				this.version = info.version;
+				this.commit = info.commit;
+				this.api = info.api;
+				const started = info.started ?? '';
+				if (started !== this.#started) {
+					if (this.#started) this.#newDaemon();
+					this.#started = started;
+				}
+			}
+			if (!this.askKeys) {
+				const next = nextLocked(this.remotes, this.#asked);
+				if (next) {
+					for (const k of next.keys) this.#asked.add(k);
+					this.askKeys = next;
+				}
 			}
 			void this.checkInstalled();
 			this.sync();
@@ -178,12 +264,15 @@ class Local {
 	}
 
 	private async restart() {
-		if (!isDesktop() || this.restarting) return;
+		// A restart on request starts the daemon itself: another start meanwhile
+		// would only race it.
+		if (!isDesktop() || this.restarting || this.restartingDaemon) return;
 		if (Date.now() - this.#lastRestart < RESTART_EVERY_MS) return;
 		this.#lastRestart = Date.now();
 		this.restarting = true;
 		try {
 			const d = await startDaemon();
+			this.#newDaemon();
 			await this.connect(d.url, d.token, false);
 		} catch {
 			// Still down: the banner says so, and the next refresh tries again.
