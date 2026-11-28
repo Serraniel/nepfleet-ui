@@ -146,7 +146,7 @@
 					<Mirrors
 						backend={b}
 						token={tokens.byBackend[b.id] ?? ''}
-						bind:adding={mirrorAdding[b.id]}
+						bind:adding={() => mirrorAdding[b.id] ?? false, (v) => (mirrorAdding[b.id] = v)}
 						onchange={() => run(b.id, true)}
 					/>
 				</div>
