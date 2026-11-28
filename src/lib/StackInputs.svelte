@@ -128,18 +128,23 @@
 			<code>{i.name}</code>
 		</label>
 		{#if i.type === 'bool'}
-			<select {id} bind:value={values[i.name]}>
+			<select {id} bind:value={values[i.name]} required={i.missing}>
 				<option value="">{i.default ? `default (${i.default})` : '—'}</option>
 				<option value="true">true</option>
 				<option value="false">false</option>
 			</select>
 		{:else if i.type === 'enum' && i.options?.length}
-			<select {id} bind:value={values[i.name]}>
+			<select {id} bind:value={values[i.name]} required={i.missing}>
 				<option value="">{i.default ? `default (${i.default})` : '—'}</option>
 				{#each i.options as o (o)}<option value={o}>{o}</option>{/each}
 			</select>
 		{:else if i.type === 'text'}
-			<textarea {id} bind:value={values[i.name]} rows="3" placeholder={i.default}></textarea>
+			<textarea
+				{id}
+				bind:value={values[i.name]}
+				rows="3"
+				placeholder={i.default}
+				required={i.missing}></textarea>
 		{:else}
 			<input
 				{id}

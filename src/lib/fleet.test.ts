@@ -130,4 +130,32 @@ describe('fleet store', () => {
 		fleet.set('local:home');
 		expect(fleet.current).toBe('local:home');
 	});
+
+	it('counts the stacks that need attention in the fleet on show', async () => {
+		data.set('nepfleet-backends', JSON.stringify([a]));
+		const { backends, fleet } = await load();
+		const { stacks } = await import('./stacks.svelte.ts');
+		backends.setLocal([vps], 'nfc_x');
+		const stack = (name: string, problems?: { kind: string; message: string }[]) => ({
+			name,
+			target: 'local',
+			mode: 'compose',
+			apply: 'auto',
+			updates: 'patch',
+			problems
+		});
+		stacks.byBackend['a'] = {
+			state: 'ok',
+			stacks: [stack('sure', [{ kind: 'missing-input', message: 'm' }]), stack('web')]
+		};
+		stacks.byBackend['local:vps'] = {
+			state: 'ok',
+			stacks: [stack('homebox', [{ kind: 'plan', message: 'm' }])]
+		};
+		expect(fleet.attention).toBe(2);
+		fleet.set('a');
+		expect(fleet.attention).toBe(1);
+		stacks.byBackend['a'] = { state: 'loading' };
+		expect(fleet.attention).toBe(0);
+	});
 });
