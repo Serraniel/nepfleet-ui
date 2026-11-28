@@ -24,6 +24,24 @@ export type Status =
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**
+ * The reason a request failed, as the server gave it: plain text from the
+ * API, or {"error": …} from the control daemon (e.g. "vps is reconnecting").
+ * Only the bare status when there is no reason.
+ */
+export async function responseError(res: Response): Promise<Error> {
+	const text = (await res.text().catch(() => '')).trim();
+	let reason = text;
+	try {
+		const msg = (JSON.parse(text) as { error?: unknown }).error;
+		if (typeof msg === 'string') reason = msg;
+	} catch {
+		// not JSON: the text is the reason
+	}
+	if (reason.length > 500) reason = reason.slice(0, 500) + '…';
+	return new Error(reason || `HTTP ${res.status}`);
+}
+
+/**
  * Normalises a user-entered backend URL. HTTPS is required except on
  * loopback: anything else would send credentials in the clear.
  */
@@ -68,7 +86,7 @@ export async function fetchInfo(
 		credentials: token ? 'omit' : 'include',
 		headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
 	});
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const body: unknown = await res.json();
 	if (!isInfo(body)) throw new Error('Unexpected response: is this a NepFleet backend?');
 	return body;
@@ -187,7 +205,7 @@ export async function fetchStacks(
 	});
 	if (res.status === 401) throw new AuthError('The backend refused the token');
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const body: unknown = await res.json();
 	if (!Array.isArray(body) || !body.every(isStack)) throw new Error('Unexpected response');
 	return body;
@@ -235,7 +253,7 @@ async function apiGet<T>(
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
 	if (res.status === 403) throw new ScopeError(scopeMessage(neededScope(path)));
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const body: unknown = await res.json();
 	if (!validate(body)) throw new Error('Unexpected response');
 	return body;
@@ -319,7 +337,7 @@ export async function saveStackFiles(
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
 	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown };
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
@@ -376,7 +394,7 @@ export async function createStack(
 		);
 	}
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { name?: unknown; commit?: unknown; port?: unknown };
 	if (typeof o.name !== 'string' || typeof o.commit !== 'string')
 		throw new Error('Unexpected response');
@@ -660,7 +678,7 @@ export async function followLogs(
 		throw new NotFoundError('No such container, or the token does not cover it');
 	if (res.status === 501)
 		throw new Error('This backend is too old to follow logs: update its NepFleet.');
-	if (!res.ok || !res.body) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok || !res.body) throw await responseError(res);
 	const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
 	for (;;) {
 		const { done, value } = await reader.read();
@@ -691,7 +709,7 @@ export async function fetchLogs(
 	if (res.status === 403) throw new ScopeError(scopeMessage('edit'));
 	if (res.status === 404)
 		throw new NotFoundError('No such container, or the token does not cover it');
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	return res.text();
 }
 
@@ -724,7 +742,7 @@ export async function serviceAction(
 		throw new NotFoundError('No such service, or the token does not cover it');
 	if (res.status === 503)
 		throw new ConflictError('An apply or restore of this stack is running; try again after it.');
-	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (res.status !== 204) throw await responseError(res);
 }
 
 /** A maintenance window as Uptime Kuma lists it. */
@@ -912,7 +930,7 @@ async function postJob(
 		throw new ScopeError('This token may only read. This needs one with the apply scope.');
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
+	if (res.status !== 202) throw await responseError(res);
 	const job: unknown = await res.json();
 	if (!isJob(job)) throw new Error('Unexpected response');
 	return job;
@@ -1055,7 +1073,7 @@ export async function syncNow(
 		throw new SyncOffError(
 			'This server does not sync: start it with nepfleet serve --sync <interval>.'
 		);
-	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
+	if (res.status !== 202) throw await responseError(res);
 }
 
 /** The secrets path of a stack, or of the fleet for stack ''. */
@@ -1126,7 +1144,7 @@ export async function setSecret(
 	if (res.status === 404)
 		throw new NotFoundError(value === null ? 'No such secret' : 'No such stack');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown };
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
@@ -1221,7 +1239,7 @@ export async function setStackInputs(
 	}
 	if (res.status === 404) throw new NotFoundError('No such stack');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown };
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
@@ -1368,7 +1386,7 @@ export async function testChannel(
 	if (res.status === 403)
 		throw new ScopeError('Sending a test needs an admin token, or signing in.');
 	if (res.status === 404) throw new NotFoundError('No such channel');
-	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (res.status !== 204) throw await responseError(res);
 }
 
 /**
@@ -1408,7 +1426,7 @@ export async function setChannel(
 			url === null ? 'No such channel' : 'This backend’s NepFleet is too old to change channels.'
 		);
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown };
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
@@ -1489,7 +1507,7 @@ export async function saveRoutes(
 	if (res.status === 403)
 		throw new ScopeError('Changing routes needs an admin token, or signing in.');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown };
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
@@ -1547,7 +1565,7 @@ export async function fetchMail(
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
 	if (res.status === 403) throw new ScopeError(scopeMessage('admin'));
 	if (res.status === 404 || res.status === 405) return null;
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const body: unknown = await res.json();
 	if (!isMailSettings(body)) throw new Error('Unexpected response');
 	return body;
@@ -1586,7 +1604,7 @@ export async function saveMail(
 	if (res.status === 404)
 		throw new NotFoundError(settings === null ? 'No mail settings to remove' : 'Not found');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown };
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
@@ -1617,7 +1635,7 @@ export async function testMail(
 	if (res.status === 403)
 		throw new ScopeError('Sending a test needs an admin token, or signing in.');
 	if (res.status === 404) throw new NotFoundError('Save the mail settings first');
-	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (res.status !== 204) throw await responseError(res);
 }
 
 export type SignOnMode = 'integrated' | 'custom' | 'none';
@@ -1741,7 +1759,7 @@ async function signOnChange(
 	if (res.status === 404) throw new NotFoundError((await res.text()).trim() || 'Not found');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
 	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown };
 	if (typeof o.commit !== 'string') throw new Error('Unexpected response');
 	return o.commit;
@@ -1813,7 +1831,7 @@ export async function fetchSBOM(
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (res.status === 503) throw new Error('The backend is busy with another operation; try again');
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	return res.blob();
 }
 
@@ -1887,7 +1905,7 @@ async function tokenRequest(
 	}
 	if (res.status === 404) throw new NotFoundError('No such token');
 	if (res.status === 422 || res.status === 400) throw new Error((await res.text()).trim());
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	return res;
 }
 
@@ -1998,7 +2016,7 @@ export async function letCaddyKeepDNS(
 		throw new ConflictError(
 			"Caddy's stack has uncommitted changes on the server: commit them first."
 		);
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const body = (await res.json()) as Record<string, unknown>;
 	if (typeof body.stack !== 'string' || typeof body.commit !== 'string')
 		throw new Error('Unexpected response');
@@ -2090,7 +2108,7 @@ export async function removeAccess(
 		throw new ScopeError('Managing people needs an admin token, or signing in.');
 	}
 	if (res.status === 404) throw new NotFoundError('No such person');
-	if (res.status !== 204) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (res.status !== 204) throw await responseError(res);
 }
 
 /**
@@ -2129,7 +2147,7 @@ export async function allowEgress(
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
 	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const o = (await res.json()) as { commit?: unknown; added?: unknown };
 	if (!Array.isArray(o.added)) throw new Error('Unexpected response');
 	return {
@@ -2195,7 +2213,7 @@ export async function startUpdates(
 	if (res.status === 404)
 		throw new NotFoundError('This backend is too old to run updates from here');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (res.status !== 202) throw new Error(`HTTP ${res.status}`);
+	if (res.status !== 202) throw await responseError(res);
 	const job: unknown = await res.json();
 	if (!isJob(job)) throw new Error('Unexpected response');
 	return job;
@@ -2235,7 +2253,7 @@ export async function backupKey(
 	}
 	if (res.status === 404)
 		throw new NotFoundError('This backend is too old to back up its key from here');
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	return res.blob();
 }
 
@@ -2316,7 +2334,7 @@ export async function addMirror(
 		throw new NotFoundError('This backend is too old to add mirrors from here');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
 	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
-	if (res.status !== 201) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (res.status !== 201) throw await responseError(res);
 	const v = (await res.json()) as { mirror?: unknown; commit?: unknown };
 	if (!isMirrors([v.mirror]) || typeof v.commit !== 'string')
 		throw new Error('Unexpected response');
@@ -2346,7 +2364,7 @@ export async function removeMirror(
 	}
 	if (res.status === 404) throw new NotFoundError('No such mirror; reload');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
-	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const v = (await res.json()) as { commit?: unknown };
 	return typeof v.commit === 'string' ? v.commit : '';
 }
@@ -2390,7 +2408,7 @@ export async function mirrorNow(
 	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
 	if (res.status === 403) throw new ScopeError('Mirroring needs an admin token, or signing in.');
 	if (res.status === 503) throw new Error('The backend is busy with another operation; try again');
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (!res.ok) throw await responseError(res);
 	const v: unknown = await res.json();
 	if (!isMirrors(v)) throw new Error('Unexpected response');
 	return v;
@@ -2538,7 +2556,7 @@ export async function startRestore(
 	if (res.status === 404) throw new NotFoundError('No such stack, or the token does not cover it');
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
 	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
-	if (res.status !== 202) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (res.status !== 202) throw await responseError(res);
 	const job: unknown = await res.json();
 	if (!isJob(job)) throw new Error('Unexpected response');
 	return job;
@@ -2611,7 +2629,7 @@ export async function importCompose(
 	}
 	if (res.status === 409) throw new ConflictError((await res.text()).trim());
 	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
-	if (res.status !== 201) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	if (res.status !== 201) throw await responseError(res);
 	const o = (await res.json()) as { stack?: unknown; commit?: unknown; log?: unknown };
 	if (typeof o.stack !== 'string' || typeof o.commit !== 'string')
 		throw new Error('Unexpected response');
