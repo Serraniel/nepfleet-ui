@@ -4,6 +4,7 @@
 	import { backends } from '#lib/backends.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
+	import Mirrors from '#lib/Mirrors.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 
@@ -90,7 +91,6 @@
 						The fleet repository lives on this server only. Changes made here apply directly. To
 						keep it in a forge too (and edit it with git), add a remote.
 					</p>
-					<p class="muted">Setting up a mirror from the app is planned.</p>
 				{:else if !s.enabled && s.remote}
 					<!-- The server can't change its own serve flags from the app yet: say
 					     what to change and where. -->
@@ -145,6 +145,9 @@
 				{/if}
 				{#if asking[b.id]}<p class="muted" role="status">{asking[b.id]}</p>{/if}
 			{/if}
+			<div id="mirrors-{b.id}">
+				<Mirrors backend={b} token={tokens.byBackend[b.id] ?? ''} />
+			</div>
 		</section>
 	{/each}
 {/if}
