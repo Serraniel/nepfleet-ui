@@ -12,7 +12,9 @@
 		type Job,
 		NotFoundError,
 		type Plan,
+		ProblemsError,
 		type StackLink,
+		type StackProblem,
 		fetchHistory,
 		fetchJob,
 		fetchPlan,
@@ -39,6 +41,8 @@
 	import { hiddenBySignOn } from '#lib/signon.ts';
 	import type { SignOnMode } from '#lib/backend.ts';
 	import TemplateMatch from '#lib/TemplateMatch.svelte';
+	import { problemsOf } from '#lib/problems.ts';
+	import StackProblems from '#lib/StackProblems.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -47,7 +51,7 @@
 	type Load<T> =
 		| { state: 'loading' }
 		| { state: 'ok'; value: T }
-		| { state: 'error'; error: string; auth: boolean };
+		| { state: 'error'; error: string; auth: boolean; problems?: StackProblem[] };
 
 	const backendId = $derived(page.params.backend ?? '');
 	const name = $derived(page.params.name ?? '');
@@ -63,9 +67,12 @@
 		return {
 			state: 'error' as const,
 			error: e instanceof Error ? e.message : String(e),
-			auth: e instanceof AuthError
+			auth: e instanceof AuthError,
+			// Reasons the owner fixes, as the backend lists them (422).
+			problems: e instanceof ProblemsError ? e.problems : undefined
 		};
 	}
+	const planProblems = $derived(plan.state === 'error' ? (plan.problems ?? []) : []);
 
 	async function loadHistory() {
 		if (!backend || !token) return;
@@ -157,20 +164,28 @@
 
 	let places = $state<StackLink[]>([]);
 	let relations = $state<ReturnType<typeof stackRelations>>({ uses: [], usedBy: [] });
+	let problems = $state<StackProblem[]>([]);
 
 	/** A nicety: without them, the rest of the page works just the same. */
 	async function loadPlaces() {
 		places = [];
 		relations = { uses: [], usedBy: [] };
+		problems = [];
 		if (!backend || !token) return;
 		try {
 			const all = await fetchStacks(backend, token);
 			const info = all.find((s) => s.name === name);
 			places = info ? stackPlaces(info) : [];
 			relations = stackRelations(all, name);
+			problems = info ? problemsOf(info) : [];
 		} catch {
 			places = [];
 		}
+	}
+
+	function savedInputs() {
+		void loadPlan();
+		void loadPlaces();
 	}
 
 	// Opened directly: remotes through the control daemon aren't listed yet.
@@ -327,13 +342,17 @@
 	</a>
 	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
+<!-- Once the plan says why it can't, Pending changes shows it; not twice. -->
+{#if !planProblems.length}
+	<StackProblems {problems} stack={name} canFill={!!backend && !!token} />
+{/if}
 {#if backend && token}
 	<StackSignOn {backend} {token} stack={name} bind:mode={signOnMode} onSaved={loadPlan} />
 	<StackInputs
 		{backend}
 		{token}
 		stack={name}
-		onSaved={loadPlan}
+		onSaved={savedInputs}
 		hide={(input) => hiddenBySignOn(input, signOnMode)}
 	/>
 {/if}
@@ -399,6 +418,9 @@
 		{/if}
 		{#if plan.state === 'loading'}
 			<p class="muted" aria-live="polite">Planning… (renders the stack on the backend)</p>
+		{:else if plan.state === 'error' && planProblems.length}
+			<p>It can't be planned: {plan.error}</p>
+			<StackProblems problems={planProblems} stack={name} heading={false} />
 		{:else if plan.state === 'error'}
 			<p class="error" role="alert">{plan.error}</p>
 		{:else}
