@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { problemsOf } from './problems.ts';
 
 /** A NepFleet backend this frontend connects to. */
 export interface Backend {
@@ -31,14 +32,28 @@ const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 export async function responseError(res: Response): Promise<Error> {
 	const text = (await res.text().catch(() => '')).trim();
 	let reason = text;
+	let problems: unknown;
 	try {
-		const msg = (JSON.parse(text) as { error?: unknown }).error;
-		if (typeof msg === 'string') reason = msg;
+		const body = JSON.parse(text) as { error?: unknown; problems?: unknown };
+		if (typeof body.error === 'string') reason = body.error;
+		problems = body.problems;
 	} catch {
 		// not JSON: the text is the reason
 	}
 	if (reason.length > 500) reason = reason.slice(0, 500) + '…';
-	return new Error(reason || `HTTP ${res.status}`);
+	reason ||= `HTTP ${res.status}`;
+	const list = problemsOf({ problems: problems as StackProblem[] | undefined });
+	return list.length ? new ProblemsError(reason, list) : new Error(reason);
+}
+
+/** A stack can't be planned for reasons its owner fixes, as the backend lists them. */
+export class ProblemsError extends Error {
+	constructor(
+		message: string,
+		readonly problems: StackProblem[]
+	) {
+		super(message);
+	}
 }
 
 /**

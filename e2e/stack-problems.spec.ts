@@ -7,7 +7,15 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // and has no problems field at all, as from a server before this.
 const BACKEND = 'http://127.0.0.1:17992';
 
-async function serve(page: Page) {
+const missing = {
+	kind: 'missing-input',
+	message: 'Required inputs without a value: Admin e-mail (ADMIN_EMAIL)',
+	inputs: [{ name: 'ADMIN_EMAIL', title: 'Admin e-mail' }]
+};
+
+// planProblems: the plan's 422 lists the problems too, as servers do now;
+// without, it's only the reason, as before.
+async function serve(page: Page, planProblems = false) {
 	await page.addInitScript((url) => {
 		localStorage.setItem('nepfleet-backends', JSON.stringify([{ id: 'b1', url }]));
 		sessionStorage.setItem('nepfleet-token-b1', 'session');
@@ -45,17 +53,7 @@ async function serve(page: Page) {
 			return json([
 				{
 					...stack('sure'),
-					...(saved.length
-						? {}
-						: {
-								problems: [
-									{
-										kind: 'missing-input',
-										message: 'Required inputs without a value: Admin e-mail (ADMIN_EMAIL)',
-										inputs: [{ name: 'ADMIN_EMAIL', title: 'Admin e-mail' }]
-									}
-								]
-							})
+					...(saved.length ? {} : { problems: [missing] })
 				},
 				stack('web')
 			]);
@@ -88,7 +86,13 @@ async function serve(page: Page) {
 		if (path === '/api/v1/stacks/sure/plan')
 			return saved.length
 				? json({ id: 'p', stack: 'sure', mode: 'compose', first: false, changes: null })
-				: json({ error: 'ADMIN_EMAIL is required' }, 422);
+				: json(
+						{
+							error: 'sure: ADMIN_EMAIL is required',
+							...(planProblems ? { problems: [missing] } : {})
+						},
+						422
+					);
 		if (path === '/api/v1/stacks/sure/history') return json([]);
 		return json({ error: 'not here' }, 404);
 	});
@@ -130,5 +134,26 @@ test('a stack that misses a required input says so, from the list to its setting
 	await field.fill('admin@example.test');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(notice).toHaveCount(0);
+	expect(saved).toEqual([{ ADMIN_EMAIL: 'admin@example.test' }]);
+});
+
+test('Pending changes says why the plan failed, with the way to the missing setting', async ({
+	page
+}) => {
+	const saved = await serve(page, true);
+	await page.goto('/stacks/b1/sure');
+	const pending = page.getByRole('region', { name: 'Pending changes' });
+	await expect(pending).toContainText("It can't be planned: sure: ADMIN_EMAIL is required");
+	await expect(pending.getByRole('alert')).toHaveCount(0);
+	// Said once, in Pending changes, not again at the top.
+	await expect(page.getByRole('region', { name: 'Needs attention' })).toHaveCount(0);
+
+	await pending.getByRole('button', { name: 'Fill in Admin e-mail' }).click();
+	const field = page.getByRole('textbox', { name: /Admin e-mail/ });
+	await expect(field).toBeFocused();
+	await expect(field).toHaveAttribute('required', '');
+	await field.fill('admin@example.test');
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(pending).not.toContainText("can't be planned");
 	expect(saved).toEqual([{ ADMIN_EMAIL: 'admin@example.test' }]);
 });

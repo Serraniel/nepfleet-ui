@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { StackProblem } from './backend.ts';
+import { ProblemsError, type StackProblem, responseError } from './backend.ts';
 import {
 	attentionCount,
 	missingNames,
@@ -48,6 +48,20 @@ describe('stack problems', () => {
 			'Missing: Admin e-mail (+1)'
 		);
 		expect(rowText(fine)).toBe('');
+	});
+	it('come with a plan the backend refused (422), and older answers stay plain', async () => {
+		const res = (body: string, status = 422) => new Response(body, { status });
+		const e = await responseError(
+			res(JSON.stringify({ error: 'sure: ADMIN_EMAIL is required', problems: [missing] }))
+		);
+		expect(e).toBeInstanceOf(ProblemsError);
+		expect(e.message).toBe('sure: ADMIN_EMAIL is required');
+		expect((e as ProblemsError).problems).toEqual([missing]);
+		const plain = await responseError(res('the stack cannot be read; see the server log', 500));
+		expect(plain).not.toBeInstanceOf(ProblemsError);
+		expect(plain.message).toBe('the stack cannot be read; see the server log');
+		const odd = await responseError(res(JSON.stringify({ error: 'x', problems: 'no' })));
+		expect(odd).not.toBeInstanceOf(ProblemsError);
 	});
 	it('are counted per backend', () => {
 		expect(attentionCount([sure, fine, sure])).toBe(2);

@@ -12,6 +12,7 @@
 		type Job,
 		NotFoundError,
 		type Plan,
+		ProblemsError,
 		type StackLink,
 		type StackProblem,
 		fetchHistory,
@@ -40,7 +41,8 @@
 	import { hiddenBySignOn } from '#lib/signon.ts';
 	import type { SignOnMode } from '#lib/backend.ts';
 	import TemplateMatch from '#lib/TemplateMatch.svelte';
-	import { missingNames, problemFix, problemShort, problemsOf } from '#lib/problems.ts';
+	import { problemsOf } from '#lib/problems.ts';
+	import StackProblems from '#lib/StackProblems.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -49,7 +51,7 @@
 	type Load<T> =
 		| { state: 'loading' }
 		| { state: 'ok'; value: T }
-		| { state: 'error'; error: string; auth: boolean };
+		| { state: 'error'; error: string; auth: boolean; problems?: StackProblem[] };
 
 	const backendId = $derived(page.params.backend ?? '');
 	const name = $derived(page.params.name ?? '');
@@ -65,9 +67,12 @@
 		return {
 			state: 'error' as const,
 			error: e instanceof Error ? e.message : String(e),
-			auth: e instanceof AuthError
+			auth: e instanceof AuthError,
+			// Reasons the owner fixes, as the backend lists them (422).
+			problems: e instanceof ProblemsError ? e.problems : undefined
 		};
 	}
+	const planProblems = $derived(plan.state === 'error' ? (plan.problems ?? []) : []);
 
 	async function loadHistory() {
 		if (!backend || !token) return;
@@ -176,15 +181,6 @@
 		} catch {
 			places = [];
 		}
-	}
-
-	/** Takes the person to the first missing setting, which the form marks required. */
-	function fillIn(p: StackProblem) {
-		const first = p.inputs?.[0];
-		const field = first && document.getElementById(`input-${name}-${first.name}`);
-		if (!field) return;
-		field.scrollIntoView({ block: 'center' });
-		field.focus();
 	}
 
 	function savedInputs() {
@@ -346,26 +342,9 @@
 	</a>
 	{#if backend && token}<SBOMButton {backend} {token} stack={name} />{/if}
 </p>
-{#if problems.length}
-	<section class="problems" aria-labelledby="problems-h">
-		<h2 id="problems-h">Needs attention</h2>
-		<ul>
-			{#each problems as p, i (i)}
-				<li>
-					<strong>{problemShort(p)}</strong>
-					{#if p.kind !== 'missing-input'}<span>{p.message}</span>{/if}
-					<span class="muted">{problemFix(p)}</span>
-					{#if p.kind === 'missing-input' && p.inputs?.length && backend && token}
-						<span>
-							<Button variant="primary" onclick={() => fillIn(p)}>
-								Fill in {missingNames(p).join(', ')}
-							</Button>
-						</span>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	</section>
+<!-- Once the plan says why it can't, Pending changes shows it; not twice. -->
+{#if !planProblems.length}
+	<StackProblems {problems} stack={name} canFill={!!backend && !!token} />
 {/if}
 {#if backend && token}
 	<StackSignOn {backend} {token} stack={name} bind:mode={signOnMode} onSaved={loadPlan} />
@@ -439,6 +418,9 @@
 		{/if}
 		{#if plan.state === 'loading'}
 			<p class="muted" aria-live="polite">Planning… (renders the stack on the backend)</p>
+		{:else if plan.state === 'error' && planProblems.length}
+			<p>It can't be planned: {plan.error}</p>
+			<StackProblems problems={planProblems} stack={name} heading={false} />
 		{:else if plan.state === 'error'}
 			<p class="error" role="alert">{plan.error}</p>
 		{:else}
@@ -723,31 +705,6 @@
 </Dialog>
 
 <style>
-	/* What the backend can't do by itself, before anything else on the page. */
-	.problems {
-		margin: 1rem 0;
-		padding: 0.75rem 1rem;
-		border: 1px solid var(--warn);
-		border-radius: calc(var(--radius) + 4px);
-	}
-	.problems h2 {
-		margin: 0 0 0.5rem;
-		font-size: 1.05rem;
-		color: var(--warn);
-	}
-	.problems ul {
-		display: grid;
-		gap: 0.75rem;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-	.problems li {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 0.25rem;
-	}
 	.places {
 		display: flex;
 		flex-wrap: wrap;
