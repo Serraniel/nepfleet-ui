@@ -7,6 +7,7 @@
 		type SetupJob,
 		type SetupPlan,
 		addRemote,
+		checkedAt,
 		describe,
 		fetchSetupJob,
 		fetchSetupPlan,
@@ -559,7 +560,11 @@ nepfleet control token</code
 					{#if r.report}<p>{describe(r.report)}</p>{/if}
 					{#if r.next}<p class="muted">{r.next}</p>{/if}
 					{#if r.tunnelError}<p class="error">{r.tunnelError}</p>{/if}
-					{#if r.error}<p class="error">Last check failed: {r.error}</p>{/if}
+					<!-- The daemon leaves out failures older than a working login since. -->
+					{#if r.error}<p class="error">
+							Last check failed{#if checkedAt(r.checked)}
+								at {checkedAt(r.checked)}{/if}: {r.error}
+						</p>{/if}
 					{#if r.lockedKeys?.length}
 						<p>
 							<Button
