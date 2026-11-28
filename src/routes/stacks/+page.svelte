@@ -3,6 +3,7 @@
 	import SBOMButton from '#lib/SBOMButton.svelte';
 	import { onMount } from 'svelte';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { stacks, tokens } from '#lib/stacks.svelte.ts';
 	import { SESSION } from '#lib/backend.ts';
@@ -36,8 +37,12 @@
 		return s?.state === 'online' ? s.info.name : b ? new URL(b.url).host : id;
 	}
 
+	// The picked fleet's stacks; the backend filter narrows within it.
+	$effect(() => {
+		if (!fleet.visible.some((b) => b.id === backendFilter)) backendFilter = '';
+	});
 	const rows = $derived(
-		backends.list.flatMap((b) => {
+		fleet.visible.flatMap((b) => {
 			const st = stacks.byBackend[b.id];
 			return st?.state === 'ok' ? st.stacks.map((s) => ({ ...s, backend: b.id })) : [];
 		})
@@ -103,7 +108,7 @@
 	<EmptyState title="No backends yet"><a href="/">Add a backend</a> to see its stacks.</EmptyState>
 {:else}
 	<section class="access" aria-label="Access per backend">
-		{#each backends.list as backend (backend.id)}
+		{#each fleet.visible as backend (backend.id)}
 			{@const st = stacks.byBackend[backend.id]}
 			<div class="card">
 				<strong>{backendName(backend.id)}</strong>
@@ -153,11 +158,13 @@
 	<div class="filters">
 		<label for="q" class="sr-only">Search</label>
 		<input id="q" type="search" placeholder="Search stacks" bind:value={query} />
-		<label for="fb" class="sr-only">Backend</label>
-		<select id="fb" bind:value={backendFilter}>
-			<option value="">All backends</option>
-			{#each backends.list as b (b.id)}<option value={b.id}>{backendName(b.id)}</option>{/each}
-		</select>
+		{#if fleet.visible.length > 1}
+			<label for="fb" class="sr-only">Backend</label>
+			<select id="fb" bind:value={backendFilter}>
+				<option value="">All backends</option>
+				{#each fleet.visible as b (b.id)}<option value={b.id}>{backendName(b.id)}</option>{/each}
+			</select>
+		{/if}
 		<label for="ft" class="sr-only">Host</label>
 		<select id="ft" bind:value={targetFilter}>
 			<option value="">All hosts</option>

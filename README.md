@@ -4,6 +4,7 @@
 
 The optional web frontend for [NepFleet](https://github.com/Serraniel/nepfleet). It is a static app, and one instance can manage **several backends**, for example your home network and your cloud servers, from one place.
 
+- **Fleet picker:** with two or more backends, the sidebar shows all fleets or one. The pages and the Notifications count follow it, `?fleet=<id>` in the address opens the same view, and the browser remembers the last pick.
 - Light and dark mode, and works on mobile.
 - Never a dead end: every stack can always be edited as raw YAML. The visual editors (services, volumes, networks, variables) are a split view over the same text.
 - No server of its own. Your browser talks to each backend directly, and each backend must allow this UI's origin (`nepfleet serve --allowed-origins https://ui.example.org`).

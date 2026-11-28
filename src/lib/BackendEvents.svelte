@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { fetchEvents } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import type { FleetEvent } from '#lib/notifications.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -9,28 +10,36 @@
 
 	type Row = FleetEvent & { backend: string; label: string };
 	let rows = $state<Row[]>([]);
-	let errors = $state<string[]>([]);
+	let errors = $state<{ backend: string; text: string }[]>([]);
 	let loading = $state(false);
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	// Loaded from every backend, shown for the picked fleet: switching needs no wait.
+	const withToken = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
+	const inFleet = (r: { backend: string }) => connected.some((b) => b.id === r.backend);
+	const shown = $derived(rows.filter(inFleet).slice(0, 300));
+	const shownErrors = $derived(errors.filter(inFleet));
 
 	async function load() {
 		loading = true;
 		errors = [];
 		const all: Row[] = [];
 		await Promise.all(
-			connected.map(async (b) => {
+			withToken.map(async (b) => {
 				const token = tokens.byBackend[b.id];
 				if (!token) return;
 				const label = b.label ?? new URL(b.url).host;
 				try {
 					for (const e of await fetchEvents(b, token)) all.push({ ...e, backend: b.id, label });
 				} catch (e) {
-					errors.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+					errors.push({
+						backend: b.id,
+						text: `${label}: ${e instanceof Error ? e.message : String(e)}`
+					});
 				}
 			})
 		);
-		rows = all.sort((a, b) => b.time.localeCompare(a.time)).slice(0, 300);
+		rows = all.sort((a, b) => b.time.localeCompare(a.time));
 		loading = false;
 	}
 
@@ -50,12 +59,12 @@
 		<p class="muted">From each backend you have a token for, newest first.</p>
 		<Button busy={loading} onclick={load}>Refresh</Button>
 	</div>
-	{#each errors as e (e)}<p class="error" role="alert">{e}</p>{/each}
-	{#if rows.length === 0 && !loading}
+	{#each shownErrors as e (e.backend)}<p class="error" role="alert">{e.text}</p>{/each}
+	{#if shown.length === 0 && !loading}
 		<EmptyState title="Nothing yet">New events show up here.</EmptyState>
 	{:else}
 		<ul class="events">
-			{#each rows as e (e.backend + '/' + e.id)}
+			{#each shown as e (e.backend + '/' + e.id)}
 				<li>
 					<span class="sev {e.severity}">{e.severity}</span>
 					<div class="body">

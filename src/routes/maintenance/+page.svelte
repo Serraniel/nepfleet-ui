@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { type KumaMaintenance, fetchMaintenance } from '#lib/backend.ts';
 	import { backends } from '#lib/backends.svelte.ts';
+	import { fleet } from '#lib/fleet.svelte.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -14,7 +15,9 @@
 
 	let byBackend = $state<Record<string, Load>>({});
 
-	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	// Loaded for every backend, shown for the picked fleet: switching needs no wait.
+	const withToken = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
+	const connected = $derived(fleet.visible.filter((b) => tokens.byBackend[b.id]));
 
 	async function load(id: string) {
 		const b = backends.list.find((x) => x.id === id);
@@ -29,7 +32,7 @@
 	}
 
 	function loadAll() {
-		for (const b of connected) void load(b.id);
+		for (const b of withToken) void load(b.id);
 	}
 
 	onMount(() => {
