@@ -7,6 +7,21 @@
 	import { isDesktop, startDaemon } from '#lib/desktop.ts';
 	import { local } from '#lib/local.svelte.ts';
 	import Toaster from '#lib/ui/Toaster.svelte';
+	import UnlockKeyDialog from '#lib/UnlockKeyDialog.svelte';
+
+	// A connected machine waits for a locked key (it expired, or the daemon
+	// restarted): ask for it on whatever page is open, as on first use.
+	let unlockOpen = $state(false);
+	let unlockKeys = $state<string[]>([]);
+	$effect(() => {
+		const ask = local.askKeys;
+		if (!ask || unlockOpen) return;
+		local.askKeys = null;
+		unlockKeys = ask.keys;
+		unlockOpen = true;
+	});
+
+	const desktop = isDesktop();
 
 	const labels: Record<Preference, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 
@@ -92,7 +107,8 @@
 				{/each}
 			</fieldset>
 			<small>
-				v{__APP_VERSION__} ·
+				v{__APP_VERSION__}{#if __APP_COMMIT__}
+					<code title={__APP_COMMIT__}>{__APP_COMMIT__.slice(0, 7)}</code>{/if} ·
 				<a href="/design" aria-current={page.url.pathname === '/design' ? 'page' : undefined}>
 					Design system
 				</a>
@@ -113,9 +129,26 @@
 				{/if}
 			</p>
 		{/if}
+		{#if local.skew}
+			{@const skew = local.skew}
+			<p class="daemon-down" role="alert">
+				This app is NepFleet {skew.app}{#if __APP_COMMIT__}
+					({__APP_COMMIT__.slice(0, 7)}){/if}, and nepfleet on this computer is {skew.daemon}{#if local.commit}
+					({local.commit.slice(0, 7)}){/if}: they don't fit together.
+				{#if skew.update === 'nepfleet'}
+					Update the nepfleet package (on Arch: nepfleet-bin or nepfleet-git; elsewhere the release
+					download). The daemon switches to it by itself, or after one restart from Fleets.
+				{:else if desktop}
+					Update this app's package (on Arch: nepfleet-desktop-git; elsewhere the release download).
+				{:else}
+					Update this web UI to the same release.
+				{/if}
+			</p>
+		{/if}
 		{@render children()}
 	</main>
 	<Toaster />
+	<UnlockKeyDialog bind:open={unlockOpen} keys={unlockKeys} />
 </div>
 
 <style>

@@ -5,6 +5,8 @@ import { installedVersion, isDesktop, restartDaemon, startDaemon } from './deskt
 import {
 	type Build,
 	type Remote,
+	DAEMON_API_FOLLOWS_UPDATES,
+	versionSkew,
 	daemonOutdated,
 	fetchDaemonInfo,
 	parseVersionOutput,
@@ -53,12 +55,16 @@ export async function untilAnswers<T>(fn: () => Promise<T>, tries = 10, waitMs =
 	}
 }
 
-/** The first machine with locked keys not asked for yet, and those keys. */
+/**
+ * The first connected machine with locked keys not asked for yet, and those
+ * keys: its tunnel waits for them. (A check alone shows a button on Fleets.)
+ */
 export function nextLocked(
 	remotes: Remote[],
 	asked: ReadonlySet<string>
 ): { name: string; keys: string[] } | null {
 	for (const r of remotes) {
+		if (!r.connect) continue;
 		const keys = (r.lockedKeys ?? []).filter((k) => !asked.has(k));
 		if (keys.length) return { name: r.name, keys };
 	}
@@ -79,17 +85,21 @@ class Local {
 	version = $state('');
 	/** The commit the daemon was built from, '' when it doesn't say. */
 	commit = $state('');
+	/** The daemon's API level, 0 before it said one. */
+	api = $state(0);
+	#started = '';
 	/** The nepfleet installed now (desktop app only): another build after an update. */
 	installed = $state<Build | null>(null);
 	/** The daemon is being restarted on request; restartError says why it failed. */
 	restartingDaemon = $state(false);
 	restartError = $state('');
 	/**
-	 * Keys to ask for now: a new daemon has a new SSH agent, so keys unlocked
-	 * in the old one are locked again. Fleets opens the prompt and clears it.
+	 * Keys to ask for now, on any page: a connected machine's tunnel waits for
+	 * them (they expired, or a daemon restarted with a new SSH agent). The
+	 * prompt in the layout opens and clears it; each key is asked for once per
+	 * daemon, and Fleets keeps a button for later.
 	 */
 	askKeys = $state<{ name: string; keys: string[] } | null>(null);
-	#askAfterStart = false;
 	#asked = new Set<string>();
 	#installedChecked = 0;
 	error = $state('');
@@ -120,6 +130,20 @@ class Local {
 		return daemonOutdated({ version: this.version, commit: this.commit }, this.installed);
 	}
 
+	/** The daemon switches to an updated nepfleet by itself. */
+	get followsUpdates() {
+		return this.api >= DAEMON_API_FOLLOWS_UPDATES;
+	}
+
+	/** This app and the running nepfleet don't fit together: which to update. */
+	get skew() {
+		return versionSkew(
+			__APP_VERSION__,
+			{ version: this.version, commit: this.commit, api: this.api },
+			this.installed
+		);
+	}
+
 	/**
 	 * Restarts the daemon with the nepfleet installed now, through the desktop
 	 * app. Tunnels come back by themselves; a running setup makes it refuse.
@@ -144,7 +168,6 @@ class Local {
 
 	/** A new daemon runs: ask for each locked key once more. */
 	#newDaemon() {
-		this.#askAfterStart = true;
 		this.#asked.clear();
 		this.askKeys = null;
 	}
@@ -194,17 +217,25 @@ class Local {
 			this.remotes = await fetchRemotes(this.url, this.token);
 			this.error = '';
 			this.daemonDown = false;
-			if (this.#askAfterStart && !this.askKeys) {
+			// Every time: the daemon may have switched to an updated nepfleet in
+			// place, without ever being unreachable.
+			const info = await fetchDaemonInfo(this.url, this.token).catch(() => null);
+			if (info) {
+				this.version = info.version;
+				this.commit = info.commit;
+				this.api = info.api;
+				const started = info.started ?? '';
+				if (started !== this.#started) {
+					if (this.#started) this.#newDaemon();
+					this.#started = started;
+				}
+			}
+			if (!this.askKeys) {
 				const next = nextLocked(this.remotes, this.#asked);
 				if (next) {
 					for (const k of next.keys) this.#asked.add(k);
 					this.askKeys = next;
 				}
-			}
-			if (!this.version) {
-				const info = await fetchDaemonInfo(this.url, this.token).catch(() => null);
-				this.version = info?.version ?? '';
-				this.commit = info?.commit ?? '';
 			}
 			void this.checkInstalled();
 			this.sync();

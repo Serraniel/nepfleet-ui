@@ -390,16 +390,76 @@ export interface Build {
 	commit: string;
 }
 
+/** The running daemon: its build, and its API level (0 before it said one). */
+export interface DaemonInfo extends Build {
+	api: number;
+	/** When it started: another value means another daemon (or a restart in place). */
+	started?: string;
+}
+
 /** The running control daemon's build, as GET /v1/info says. */
 export async function fetchDaemonInfo(
 	daemon: string,
 	token: string,
 	fetcher: typeof fetch = fetch
-): Promise<Build> {
+): Promise<DaemonInfo> {
 	const data = (await call(daemon, token, 'GET', '/v1/info', undefined, fetcher, 10000)) as
-		{ version?: unknown; commit?: unknown } | undefined;
+		{ version?: unknown; commit?: unknown; api?: unknown; started?: unknown } | undefined;
 	const str = (v: unknown) => (typeof v === 'string' ? v : '');
-	return { version: str(data?.version), commit: str(data?.commit) };
+	const api = typeof data?.api === 'number' ? data.api : 0;
+	return {
+		version: str(data?.version),
+		commit: str(data?.commit),
+		api,
+		started: str(data?.started)
+	};
+}
+
+/**
+ * The daemon API level this app needs: 2 restarts in place, keeping unlocked
+ * keys, and follows updates of nepfleet by itself.
+ */
+export const DAEMON_API_NEEDED = 2;
+
+/** Daemons from this level on switch to an updated nepfleet by themselves. */
+export const DAEMON_API_FOLLOWS_UPDATES = 2;
+
+/** Which package to update, when the app and nepfleet don't fit together. */
+export interface VersionSkew {
+	update: 'nepfleet' | 'app';
+	app: string;
+	daemon: string;
+}
+
+/** "0.4.1" → [0, 4, 1]; null for edge and dev builds. */
+function release(v: string): number[] | null {
+	const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(v);
+	return m ? m.slice(1).map(Number) : null;
+}
+
+/**
+ * Whether this app and the running nepfleet are builds that don't fit
+ * together, and which one to update. Releases go in step, so another major or
+ * minor release tells; edge builds tell by the daemon's API level. Not while the
+ * daemon is about to switch to the nepfleet installed now: that may fit.
+ */
+export function versionSkew(
+	app: string,
+	daemon: DaemonInfo,
+	installed: Build | null
+): VersionSkew | null {
+	if (!daemon.version) return null;
+	if (daemonOutdated(daemon, installed)) return null;
+	const skew = (update: VersionSkew['update']) => ({ update, app, daemon: daemon.version });
+	const a = release(app);
+	const d = release(daemon.version);
+	if (a && d) {
+		// Major and minor: a patch release on one side alone still fits.
+		const cmp = [0, 1].find((i) => a[i] !== d[i]);
+		if (cmp !== undefined) return skew((a[cmp] ?? 0) > (d[cmp] ?? 0) ? 'nepfleet' : 'app');
+	}
+	if (daemon.api < DAEMON_API_NEEDED) return skew('nepfleet');
+	return null;
 }
 
 /** Reads `nepfleet version` output: "nepfleet 0.4.0 (abc123)". */

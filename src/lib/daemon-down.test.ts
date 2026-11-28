@@ -46,8 +46,20 @@ describe('after a restart', () => {
 	it('asks for each locked key once', () => {
 		const remotes = [
 			{ name: 'a', address: 'ssh://a.example.test' },
-			{ name: 'vps', address: 'ssh://vps.example.test', lockedKeys: ['~/.ssh/id_rsa'] },
-			{ name: 'nas', address: 'ssh://nas.example.test', lockedKeys: ['~/.ssh/id_rsa', 'k2'] }
+			// Only checked, not connected: Fleets shows a button instead.
+			{ name: 'lab', address: 'ssh://lab.example.test', lockedKeys: ['k3'] },
+			{
+				name: 'vps',
+				address: 'ssh://vps.example.test',
+				connect: true,
+				lockedKeys: ['~/.ssh/id_rsa']
+			},
+			{
+				name: 'nas',
+				address: 'ssh://nas.example.test',
+				connect: true,
+				lockedKeys: ['~/.ssh/id_rsa', 'k2']
+			}
 		];
 		const asked = new Set<string>();
 		const first = nextLocked(remotes, asked);
