@@ -35,6 +35,7 @@
 	import { tokens } from '#lib/stacks.svelte.ts';
 	import Containers from '#lib/Containers.svelte';
 	import Restore from '#lib/Restore.svelte';
+	import RemoveStack from '#lib/RemoveStack.svelte';
 	import SBOMButton from '#lib/SBOMButton.svelte';
 	import StackInputs from '#lib/StackInputs.svelte';
 	import StackSignOn from '#lib/StackSignOn.svelte';
@@ -656,6 +657,7 @@
 			</ol>
 		{/if}
 	</section>
+	{#if backend && token}<RemoveStack {backend} {token} stack={name} />{/if}
 {/if}
 
 <Dialog bind:open={rollbackOpen} title="Roll back {name}?">
