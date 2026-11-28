@@ -26,6 +26,7 @@ import {
 	fetchPlan,
 	fetchStacks,
 	normalizeUrl,
+	responseError,
 	stackPlaces,
 	stackRelations,
 	SyncOffError,
@@ -69,6 +70,17 @@ import {
 	saveMail,
 	testMail
 } from './backend.ts';
+
+describe('responseError', () => {
+	it("shows the control daemon's reason, the API's text, or the status", async () => {
+		const json = new Response('{"error":"vps is reconnecting"}', { status: 503 });
+		expect((await responseError(json)).message).toBe('vps is reconnecting');
+		expect((await responseError(new Response('no fleet\n', { status: 503 }))).message).toBe(
+			'no fleet'
+		);
+		expect((await responseError(new Response('', { status: 503 }))).message).toBe('HTTP 503');
+	});
+});
 
 describe('mail', () => {
 	const backend = { id: 'b', url: 'https://fleet.example.org' };
