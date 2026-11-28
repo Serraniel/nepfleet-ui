@@ -28,6 +28,7 @@ import {
 	daemonOutdated,
 	fetchDaemonInfo,
 	parseVersionOutput,
+	checkedAt,
 	versionSkew
 } from './local.ts';
 
@@ -439,6 +440,22 @@ group('updateOffer', () => {
 		expect(updateOffer(at('0.3.1'), 'v0.4.0-dev')).toBeNull();
 		expect(updateOffer(undefined, 'v0.4.0')).toBeNull();
 		expect(updateOffer(at('0.3.1'), '')).toBeNull();
+	});
+});
+
+group('when a check failed', () => {
+	it('says the time today, and the day before that', () => {
+		const now = new Date(2026, 10, 28, 15, 0);
+		const today = new Date(2026, 10, 28, 9, 5).toISOString();
+		const earlier = new Date(2026, 10, 27, 9, 5).toISOString();
+		const time = new Date(today).toLocaleTimeString(undefined, {
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+		expect(checkedAt(today, now)).toBe(time);
+		expect(checkedAt(earlier, now)).toMatch(new RegExp(`27.*, ${time}$`));
+		expect(checkedAt(undefined, now)).toBe('');
+		expect(checkedAt('not a time', now)).toBe('');
 	});
 });
 
