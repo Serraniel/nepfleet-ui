@@ -1935,7 +1935,8 @@ export interface DoctorReport {
 		fix?: string;
 		/**
 		 * A fix the app can start: dns-records is letCaddyKeepDNS, key-backup is
-		 * backupKey (the backend records the copy, so the warning clears).
+		 * backupKey (the backend records the copy, so the warning clears), mirror
+		 * is the mirror setup (addMirror, then mirrorNow).
 		 */
 		action?: string;
 	}[];
@@ -2243,6 +2244,111 @@ export interface MirrorStatus {
 	url: string;
 	ok?: string;
 	error?: string;
+	/** The mirror in the API; absent from older backends. */
+	id?: string;
+	/** How pushes sign in: a deploy key or token the app stored, or the host's own. */
+	auth?: 'deploy-key' | 'token' | 'host';
+	/** The deploy key's public half, to add to the forge with write access. */
+	publicKey?: string;
+}
+
+/** A mirror to add: an https token goes separately, never in the URL. */
+export interface MirrorAdd {
+	url: string;
+	token?: string;
+	user?: string;
+}
+
+/** The kind of mirror URL the backend accepts, or why not (as the backend checks it). */
+export function mirrorURLKind(url: string): 'ssh' | 'https' | 'local' | { error: string } {
+	const u = url.trim();
+	if (!u) return { error: '' };
+	if (u.startsWith('/') || u.startsWith('file:///')) return 'local';
+	if (/^[A-Za-z0-9._-]+@[A-Za-z0-9][A-Za-z0-9.-]*:\S+$/.test(u) && !u.includes('://')) return 'ssh';
+	let p: URL;
+	try {
+		p = new URL(u);
+	} catch {
+		return { error: 'Use ssh://…, user@host:path, https://… or a path on the server.' };
+	}
+	if (p.protocol === 'https:' && (p.username || p.password))
+		return {
+			error:
+				'No user name or token in the URL: it would be stored in plain text. Use the token field.'
+		};
+	if (p.protocol === 'ssh:' && p.password)
+		return { error: 'No password in the URL: the server makes a deploy key instead.' };
+	if (p.protocol === 'ssh:') return 'ssh';
+	if (p.protocol === 'https:') return 'https';
+	return { error: `${p.protocol}// isn't encrypted or isn't supported; use ssh:// or https://.` };
+}
+
+/**
+ * Adds a mirror (admin; a person needs a recent passkey check). For SSH the
+ * backend makes a deploy key and returns its public half.
+ */
+export async function addMirror(
+	backend: Backend,
+	token: string,
+	req: MirrorAdd,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<{ mirror: MirrorStatus; commit: string }> {
+	const res = await fetcher(`${backend.url}/api/v1/mirror/remotes`, {
+		method: 'POST',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...authInit(token).headers
+		},
+		body: JSON.stringify(req)
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Adding a mirror needs an admin token, or signing in.');
+	}
+	if (res.status === 404 || res.status === 405)
+		throw new NotFoundError('This backend is too old to add mirrors from here');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (res.status === 422) throw new InvalidEditError((await res.text()).trim());
+	if (res.status !== 201) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const v = (await res.json()) as { mirror?: unknown; commit?: unknown };
+	if (!isMirrors([v.mirror]) || typeof v.commit !== 'string')
+		throw new Error('Unexpected response');
+	return { mirror: v.mirror as MirrorStatus, commit: v.commit };
+}
+
+/** Removes a mirror and the key or token the backend stored for it. */
+export async function removeMirror(
+	backend: Backend,
+	token: string,
+	id: string,
+	fetcher: typeof fetch = fetch,
+	timeoutMs = 60000
+): Promise<string> {
+	const res = await fetcher(`${backend.url}/api/v1/mirror/remotes/${encodeURIComponent(id)}`, {
+		method: 'DELETE',
+		signal: AbortSignal.timeout(timeoutMs),
+		credentials: authInit(token).credentials,
+		headers: { Accept: 'application/json', ...authInit(token).headers }
+	});
+	if (res.status === 401) throw new AuthError('The backend refused the token');
+	if (res.status === 429) throw new AuthError('Too many failed attempts; wait a minute');
+	if (res.status === 403) {
+		const o = (await res.json().catch(() => null)) as { verify?: unknown } | null;
+		if (o?.verify === true) throw new VerifyFirstError('Confirm it’s you with a passkey');
+		throw new ScopeError('Removing a mirror needs an admin token, or signing in.');
+	}
+	if (res.status === 404) throw new NotFoundError('No such mirror; reload');
+	if (res.status === 409) throw new ConflictError((await res.text()).trim());
+	if (!res.ok) throw new Error((await res.text()).trim() || `HTTP ${res.status}`);
+	const v = (await res.json()) as { commit?: unknown };
+	return typeof v.commit === 'string' ? v.commit : '';
 }
 
 const isMirrors = (v: unknown): v is MirrorStatus[] =>

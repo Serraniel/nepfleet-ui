@@ -51,6 +51,9 @@ import {
 	backupKey,
 	fetchMirrors,
 	mirrorNow,
+	mirrorURLKind,
+	addMirror,
+	removeMirror,
 	fetchEvents,
 	fetchMatches,
 	fetchBackups,
@@ -987,6 +990,58 @@ describe('mirrors', () => {
 		}) as unknown as typeof fetch;
 		expect((await mirrorNow(backend, 't', ok))[0]?.ok).toBeTruthy();
 		expect(method).toBe('POST');
+	});
+	it('tells the kinds of mirror URL apart, and refuses credentials in them', () => {
+		expect(mirrorURLKind('git@codeberg.example.test:me/fleet.git')).toBe('ssh');
+		expect(mirrorURLKind('ssh://git@git.example.test:2222/fleet.git')).toBe('ssh');
+		expect(mirrorURLKind('https://git.example.test/me/fleet.git')).toBe('https');
+		expect(mirrorURLKind('/srv/backup/fleet.git')).toBe('local');
+		for (const bad of [
+			'https://bot:s3cr3t@git.example.test/x.git',
+			'https://tok3n@git.example.test/x.git',
+			'http://git.example.test/x.git',
+			'git://git.example.test/x.git',
+			'relative/path'
+		])
+			expect(typeof mirrorURLKind(bad)).toBe('object');
+	});
+	it('adds a mirror, confirming with a passkey first when asked', async () => {
+		let body = '';
+		const added = (async (_u: string, init: RequestInit) => {
+			body = String(init.body);
+			return new Response(
+				JSON.stringify({
+					mirror: {
+						id: 'a1',
+						url: 'git@h:x.git',
+						auth: 'deploy-key',
+						publicKey: 'ssh-ed25519 AAAA'
+					},
+					commit: 'c'
+				}),
+				{ status: 201 }
+			);
+		}) as unknown as typeof fetch;
+		const r = await addMirror(backend, 't', { url: 'git@h:x.git' }, added);
+		expect(r.mirror.publicKey).toBe('ssh-ed25519 AAAA');
+		expect(JSON.parse(body)).toEqual({ url: 'git@h:x.git' });
+		const verify = (async () =>
+			new Response(JSON.stringify({ verify: true }), { status: 403 })) as unknown as typeof fetch;
+		await expect(addMirror(backend, 't', { url: 'x' }, verify)).rejects.toBeInstanceOf(
+			VerifyFirstError
+		);
+		const bad = (async () =>
+			new Response('no token in the URL', { status: 422 })) as unknown as typeof fetch;
+		await expect(addMirror(backend, 't', { url: 'x' }, bad)).rejects.toBeInstanceOf(
+			InvalidEditError
+		);
+		let path = '';
+		const removed = (async (u: string, init: RequestInit) => {
+			path = `${init.method} ${u}`;
+			return new Response(JSON.stringify({ commit: 'd' }));
+		}) as unknown as typeof fetch;
+		expect(await removeMirror(backend, 't', 'a1', removed)).toBe('d');
+		expect(path).toBe('DELETE https://fleet.example.org/api/v1/mirror/remotes/a1');
 	});
 });
 

@@ -29,6 +29,17 @@
 			c.status === 'warn' &&
 			c.detail.startsWith('no copy of the age key is known'));
 
+	// The mirror setup, opened from the Repository mirror check.
+	let mirrorAdding = $state<Record<string, boolean>>({});
+	const offersMirror = (c: Check) =>
+		c.action === 'mirror' || (c.name === 'Repository mirror' && c.status !== 'ok');
+	const noMirror = (c: Check) => c.detail.startsWith('the fleet repository has no second remote');
+
+	function openMirrors(id: string, add: boolean) {
+		if (add) mirrorAdding[id] = true;
+		document.getElementById(`mirrors-${id}`)?.scrollIntoView({ behavior: 'smooth' });
+	}
+
 	function keyBackedUp(id: string) {
 		keySaved[id] = true;
 		keyOpen[id] = false;
@@ -37,11 +48,12 @@
 
 	const connected = $derived(backends.list.filter((b) => tokens.byBackend[b.id]));
 
-	async function run(id: string) {
+	// quiet: keep showing the last report meanwhile, so the forms in it stay.
+	async function run(id: string, quiet = false) {
 		const b = backends.list.find((x) => x.id === id);
 		const token = tokens.byBackend[id];
 		if (!b || !token) return;
-		byBackend[id] = { state: 'loading' };
+		if (!quiet || byBackend[id]?.state !== 'ok') byBackend[id] = { state: 'loading' };
 		try {
 			byBackend[id] = { state: 'ok', value: await fetchDoctor(b, token) };
 		} catch (e) {
@@ -108,6 +120,9 @@
 								>
 									Back up the key…
 								</Button>{/if}
+							{#if offersMirror(c)}<Button onclick={() => openMirrors(b.id, noMirror(c))}>
+									{noMirror(c) ? 'Set up a mirror…' : 'Mirrors…'}
+								</Button>{/if}
 							{#if c.fix && c.status !== 'ok'}<span class="fix">→ {c.fix}</span>{/if}
 						</li>
 					{/each}
@@ -127,7 +142,14 @@
 						domain={dnsDomain(dns.detail)}
 					/>
 				{/if}
-				<Mirrors backend={b} token={tokens.byBackend[b.id] ?? ''} />
+				<div id="mirrors-{b.id}">
+					<Mirrors
+						backend={b}
+						token={tokens.byBackend[b.id] ?? ''}
+						bind:adding={() => mirrorAdding[b.id] ?? false, (v) => (mirrorAdding[b.id] = v)}
+						onchange={() => run(b.id, true)}
+					/>
+				</div>
 				<h3>Security</h3>
 				{#if r.securityError}
 					<p class="error">The security check couldn't run: {r.securityError}</p>
