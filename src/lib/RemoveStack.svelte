@@ -209,8 +209,9 @@
 						<ul aria-label="Data">
 							{#each plan.volumes as v (v.name)}
 								<li>
-									volume <code>{v.name}</code>{#if plan.backup && !v.backup}
-										(not in the backup){/if}
+									volume <code>{v.name}</code>{plan.backup && !v.backup
+										? ' (not in the backup)'
+										: ''}
 								</li>
 							{/each}
 							{#each plan.workData as d (d)}
